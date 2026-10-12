@@ -294,6 +294,26 @@ class OkHttpMockInterceptorTest {
         assertEquals("""{"name":"Ñandú 日本"}""", response.body!!.string())
     }
 
+    @Test
+    fun `root path resolves to index json`() {
+        val provider = FakeProvider(mapOf("index.json" to USER))
+
+        val response = clientFor(provider).get("http://example.com/")
+
+        assertEquals(USER, response.body!!.string())
+        assertEquals(listOf("index.json"), provider.requestedPaths)
+    }
+
+    @Test
+    fun `trailing slash resolves to the same file as the path without it`() {
+        val provider = FakeProvider(mapOf("api/v1/users.json" to USERS))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/users/")
+
+        assertEquals(USERS, response.body!!.string())
+        assertEquals(listOf("api/v1/users.json"), provider.requestedPaths)
+    }
+
     private companion object {
         const val USER = """{"id":1,"name":"John"}"""
         const val NUMBERS = """["0123456789"]"""

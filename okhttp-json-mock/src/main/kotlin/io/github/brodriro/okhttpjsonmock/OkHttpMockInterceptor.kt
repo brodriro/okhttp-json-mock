@@ -18,6 +18,7 @@ import kotlin.math.abs
  *
  * The file is chosen from the request URL: `/api/v1/users?page=1` is looked up as
  * `api/v1/users/page=1.json` and then as `api/v1/users.json`. Host, headers and body are ignored.
+ * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
  *
@@ -113,7 +114,7 @@ public class OkHttpMockInterceptor(
 
     /** Files that can answer [url], most specific first. */
     private fun candidatePaths(url: HttpUrl): List<String> {
-        val path = url.encodedPath.substring(1)
+        val path = url.encodedPath.trim('/').ifEmpty { ROOT_FILE_NAME }
         val query = url.encodedQuery.orEmpty()
         val queryFile = if (query.isEmpty()) null else "$basePath$path/$query.json"
         return listOfNotNull(queryFile, "$basePath$path.json")
@@ -182,6 +183,7 @@ public class OkHttpMockInterceptor(
         const val DEFAULT_BASE_PATH = ""
         const val DELAY_DEFAULT_MIN = 500
         const val DELAY_DEFAULT_MAX = 1500
+        const val ROOT_FILE_NAME = "index"
         const val HTTP_OK = 200
         const val HTTP_NOT_FOUND = 404
         const val HTTP_GATEWAY_TIMEOUT = 504
