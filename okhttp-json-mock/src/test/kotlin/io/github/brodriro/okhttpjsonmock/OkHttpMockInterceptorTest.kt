@@ -512,6 +512,29 @@ class OkHttpMockInterceptorTest {
         return newCall(Request.Builder().url(url).method(method, body).build()).execute().body!!.string()
     }
 
+    @Test
+    fun `a mock named with sorted parameters answers any parameter order`() {
+        val provider = FakeProvider(mapOf("api/v1/posts/categoryId=5&page=1.json" to USERS))
+        val client = clientFor(provider)
+
+        assertEquals(USERS, client.get("http://example.com/api/v1/posts?page=1&categoryId=5").body!!.string())
+        assertEquals(USERS, client.get("http://example.com/api/v1/posts?categoryId=5&page=1").body!!.string())
+    }
+
+    @Test
+    fun `a mock named with the exact parameter order wins over the sorted one`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/posts/page=1&categoryId=5.json" to USER,
+                "api/v1/posts/categoryId=5&page=1.json" to USERS,
+            ),
+        )
+
+        val response = clientFor(provider).get("http://example.com/api/v1/posts?page=1&categoryId=5")
+
+        assertEquals(USER, response.body!!.string())
+    }
+
     private companion object {
         const val USER = """{"id":1,"name":"John"}"""
         const val NUMBERS = """["0123456789"]"""

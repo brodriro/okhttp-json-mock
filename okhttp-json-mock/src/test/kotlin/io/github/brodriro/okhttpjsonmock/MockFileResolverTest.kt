@@ -42,6 +42,26 @@ class MockFileResolverTest {
     }
 
     @Test
+    fun `query with unsorted parameters also tries the sorted form`() {
+        assertEquals(
+            listOf(
+                "api/v1/posts/page=1&categoryId=5.get.json",
+                "api/v1/posts/categoryId=5&page=1.get.json",
+                "api/v1/posts.get.json",
+                "api/v1/posts/page=1&categoryId=5.json",
+                "api/v1/posts/categoryId=5&page=1.json",
+                "api/v1/posts.json",
+            ),
+            candidates("GET", "http://example.com/api/v1/posts?page=1&categoryId=5"),
+        )
+    }
+
+    @Test
+    fun `query already sorted is not tried twice`() {
+        assertEquals(4, candidates("GET", "http://example.com/api/v1/posts?categoryId=5&page=1").size)
+    }
+
+    @Test
     fun `method suffix is lower case whatever the request uses`() {
         assertEquals("api/v1/users.post.json", candidates("post", "http://example.com/api/v1/users").first())
         assertEquals("api/v1/users.post.json", candidates("Post", "http://example.com/api/v1/users").first())
