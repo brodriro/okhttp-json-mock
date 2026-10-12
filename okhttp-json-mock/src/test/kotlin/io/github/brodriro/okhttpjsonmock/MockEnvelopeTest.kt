@@ -48,10 +48,58 @@ class MockEnvelopeTest {
     }
 
     @Test
+    fun `headers are optional`() {
+        val envelope = parse("""{"statusCode":201,"response":{"id":4}}""")!!
+
+        assertEquals(emptyList(), envelope.headers)
+        assertNull(envelope.contentType)
+    }
+
+    @Test
+    fun `headers are read in file order and accept numbers and booleans`() {
+        val envelope = parse(
+            """{"statusCode":201,"headers":{"Location":"/api/v1/users/4","X-Total-Count":3,"X-Cached":false},"response":{"id":4}}""",
+        )!!
+
+        assertEquals(
+            listOf("Location" to "/api/v1/users/4", "X-Total-Count" to "3", "X-Cached" to "false"),
+            envelope.headers,
+        )
+        assertEquals("""{"id":4}""", envelope.body.decodeToString())
+    }
+
+    @Test
+    fun `content type is kept apart from the other headers`() {
+        val envelope = parse("""{"statusCode":200,"headers":{"content-type":"text/plain","X-Trace":"1"},"response":"ok"}""")!!
+
+        assertEquals("text/plain", envelope.contentType)
+        assertEquals(listOf("X-Trace" to "1"), envelope.headers)
+    }
+
+    @Test
+    fun `envelope can have headers and no response`() {
+        val envelope = parse("""{"statusCode":204,"headers":{"X-Deleted":"1"}}""")!!
+
+        assertEquals(0, envelope.body.size)
+        assertEquals(listOf("X-Deleted" to "1"), envelope.headers)
+    }
+
+    @Test
+    fun `headers that are not an object of simple values are rejected naming the file`() {
+        val notAnObject = assertFailsWith<IOException> { parse("""{"statusCode":200,"headers":["a"]}""") }
+        assertContains(notAnObject.message!!, "users.post.json")
+
+        assertFailsWith<IOException> { parse("""{"statusCode":200,"headers":{"X-A":{"nested":1}}}""") }
+        assertFailsWith<IOException> { parse("""{"statusCode":200,"headers":{"X-A":null}}""") }
+        assertFailsWith<IOException> { parse("""{"statusCode":200,"headers":{"Bad Name":"1"}}""") }
+    }
+
+    @Test
     fun `plain mocks are not envelopes`() {
         assertNull(parse("""{"id":1,"name":"John"}"""))
         assertNull(parse("""[{"id":1},{"id":2}]"""))
         assertNull(parse("""{"response":{"id":1}}"""))
+        assertNull(parse("""{"headers":{"X-A":"1"},"response":{"id":1}}"""))
     }
 
     @Test

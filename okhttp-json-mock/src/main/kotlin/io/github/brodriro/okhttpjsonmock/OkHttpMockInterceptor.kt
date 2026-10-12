@@ -3,7 +3,7 @@ package io.github.brodriro.okhttpjsonmock
 import io.github.brodriro.okhttpjsonmock.providers.DefaultInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import okhttp3.Interceptor
-import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
@@ -22,9 +22,10 @@ import kotlin.random.Random
  *
  * A mock is answered as it is with status 200. To answer with another status, wrap it:
  * `{ "statusCode": 201, "response": { "id": 4 } }` answers 201 with `{"id":4}` as the body, and
- * `{ "statusCode": 204 }` answers 204 with no body. A file is only treated as a wrapper when
- * `statusCode` and `response` are its only keys, so real payloads that happen to have a
- * `statusCode` field are left alone.
+ * `{ "statusCode": 204 }` answers 204 with no body. The wrapper can also carry response headers
+ * in an optional `"headers": { "Location": "/users/4" }` object. A file is only treated as a
+ * wrapper when it has `statusCode` and no keys other than `statusCode`, `headers` and `response`,
+ * so real payloads that happen to have a `statusCode` field are left alone.
  * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
@@ -129,21 +130,35 @@ public class OkHttpMockInterceptor private constructor(
         }
         val statusCode = envelope?.statusCode ?: HTTP_OK
         logger.log("$call -> $statusCode from $path")
-        return response(request, statusCode, envelope?.body ?: mock, CONTENT_TYPE_JSON)
+        return response(
+            request,
+            statusCode,
+            envelope?.body ?: mock,
+            envelope?.contentType ?: CONTENT_TYPE_JSON,
+            envelope?.headers.orEmpty(),
+        )
     }
 
     /** The raw bytes of the mock at [path], or `null` when the provider has no such file. */
     private fun readMock(path: String): ByteArray? = inputStreamProvider.provide(path)?.use { it.readBytes() }
 
-    private fun response(request: Request, code: Int, body: ByteArray, contentType: String): Response =
-        Response.Builder()
+    private fun response(
+        request: Request,
+        code: Int,
+        body: ByteArray,
+        contentType: String,
+        headers: List<Pair<String, String>> = emptyList(),
+    ): Response {
+        val builder = Response.Builder()
             .code(code)
             .message(reasonPhrase(code))
             .request(request)
             .protocol(Protocol.HTTP_1_1)
-            .body(body.toResponseBody(contentType.toMediaType()))
+            .body(body.toResponseBody(contentType.toMediaTypeOrNull()))
             .addHeader("content-type", contentType)
-            .build()
+        headers.forEach { (name, value) -> builder.addHeader(name, value) }
+        return builder.build()
+    }
 
     private fun reasonPhrase(code: Int): String = when (code) {
         200 -> "OK"

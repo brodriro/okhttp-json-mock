@@ -18,6 +18,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -617,6 +618,57 @@ class OkHttpMockInterceptorTest {
     private fun OkHttpClient.send(method: String, url: String): Response {
         val body = if (method == "GET") null else "{}".toRequestBody("application/json".toMediaType())
         return newCall(Request.Builder().url(url).method(method, body).build()).execute()
+    }
+
+    @Test
+    fun `envelope headers are sent with the response`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users.post.json" to
+                    """{"statusCode":201,"headers":{"Location":"/api/v1/users/4","X-Total-Count":4},"response":{"id":4}}""",
+            ),
+        )
+
+        val response = clientFor(provider).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(201, response.code)
+        assertEquals("/api/v1/users/4", response.header("Location"))
+        assertEquals("4", response.header("X-Total-Count"))
+        assertEquals("application/json", response.header("content-type"))
+        assertEquals("""{"id":4}""", response.body!!.string())
+    }
+
+    @Test
+    fun `envelope without headers only sends the content type`() {
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"statusCode":201,"response":{"id":4}}"""))
+
+        val response = clientFor(provider).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(listOf("content-type"), response.headers.names().toList())
+    }
+
+    @Test
+    fun `envelope content type header replaces the default`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/health.json" to """{"statusCode":200,"headers":{"Content-Type":"text/plain"},"response":"ok"}"""),
+        )
+
+        val response = clientFor(provider).get("http://example.com/api/v1/health")
+
+        assertEquals(listOf("text/plain"), response.headers("content-type"))
+        assertEquals("text", response.body!!.contentType()!!.type)
+    }
+
+    @Test
+    fun `simulated failure does not send the envelope headers`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/users.post.json" to """{"statusCode":201,"headers":{"Location":"/api/v1/users/4"}}"""),
+        )
+
+        val response = clientFor(provider, failurePercentage = 100).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(504, response.code)
+        assertNull(response.header("Location"))
     }
 
     private companion object {
