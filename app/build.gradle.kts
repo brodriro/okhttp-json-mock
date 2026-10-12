@@ -31,11 +31,10 @@ dependencies {
     implementation(project(":okhttp-json-mock"))
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
 
     implementation(libs.okhttp)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
-    implementation(libs.retrofit.adapter.rxjava2)
-    implementation(libs.rxjava)
-    implementation(libs.rxandroid)
+    implementation(libs.kotlinx.coroutines.android)
 }

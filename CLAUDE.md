@@ -9,7 +9,7 @@ A small JVM library that mocks HTTP responses for OkHttp/Retrofit: an OkHttp `In
 ## Modules
 
 - `okhttp-json-mock/` — the library. Kotlin (`explicitApi`), Java 8 bytecode, published as `io.github.brodriro:okhttp-json-mock`.
-- `app/` — Android sample app (Retrofit + RxJava2, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...`.
+- `app/` — Android sample app in Kotlin (Retrofit suspend calls, coroutines, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...` and is also exercised by the library's `SampleMocksTest`. It needs no Kotlin plugin: AGP 9 compiles Kotlin on its own.
 
 ## Commands
 
@@ -47,7 +47,7 @@ With several query parameters the exact string is tried first (`page=1&categoryI
 
 A mock is answered as it is with status 200. To answer with another status the file wraps the response in an envelope read by `MockEnvelope` with Gson: `{ "statusCode": 201, "response": { ... } }` answers 201 with the `response` value as the body, and `{ "statusCode": 204 }` answers with no body. An optional `"headers": { "Location": "/users/4" }` object adds response headers (values may be strings, numbers or booleans; `Content-Type` replaces the default). A file is an envelope only when it is an object that has `statusCode` and no keys other than `statusCode`, `headers` and `response`; everything else, including a real payload with a `statusCode` field plus other keys, is served untouched. An envelope whose `statusCode` is not an HTTP status, or whose `headers` is not an object of valid names and simple values, fails the call with an `IOException` naming the file.
 
-Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `getAssets().open(path)` (see `MainActivity.getAndroidProvider`). A provider signals "not found" by returning `null`.
+Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `assets.open(path)` (see `MainActivity.assetsProvider`). A provider signals "not found" by returning `null`.
 
 Behaviours that are easy to miss:
 
