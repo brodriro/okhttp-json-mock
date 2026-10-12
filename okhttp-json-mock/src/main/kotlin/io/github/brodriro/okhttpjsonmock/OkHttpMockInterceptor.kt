@@ -2,7 +2,6 @@ package io.github.brodriro.okhttpjsonmock
 
 import io.github.brodriro.okhttpjsonmock.providers.DefaultInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
-import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
@@ -40,6 +39,8 @@ public class OkHttpMockInterceptor private constructor(
     public val failureCode: Int,
     private val logger: MockLogger,
 ) : Interceptor {
+
+    private val resolver = MockFileResolver(basePath)
 
     init {
         require(failureCode in 400..599) { "failureCode must be a 4xx or 5xx status: $failureCode" }
@@ -96,7 +97,7 @@ public class OkHttpMockInterceptor private constructor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        val candidates = candidatePaths(request.url)
+        val candidates = resolver.candidates(request.url)
         val match = candidates.firstNotNullOfOrNull { path -> readMock(path)?.let { path to it } }
         try {
             Thread.sleep(nextDelayMilliseconds())
@@ -118,14 +119,6 @@ public class OkHttpMockInterceptor private constructor(
         }
         logger.log("$call -> $HTTP_OK from $path")
         return response(request, HTTP_OK, mock, CONTENT_TYPE_JSON)
-    }
-
-    /** Files that can answer [url], most specific first. */
-    private fun candidatePaths(url: HttpUrl): List<String> {
-        val path = url.encodedPath.trim('/').ifEmpty { ROOT_FILE_NAME }
-        val query = url.encodedQuery.orEmpty()
-        val queryFile = if (query.isEmpty()) null else "$basePath$path/$query.json"
-        return listOfNotNull(queryFile, "$basePath$path.json")
     }
 
     /** The raw bytes of the mock at [path], or `null` when the provider has no such file. */
@@ -225,7 +218,6 @@ public class OkHttpMockInterceptor private constructor(
         const val DEFAULT_BASE_PATH = ""
         const val DELAY_DEFAULT_MIN = 500
         const val DELAY_DEFAULT_MAX = 1500
-        const val ROOT_FILE_NAME = "index"
         const val HTTP_OK = 200
         const val HTTP_NOT_FOUND = 404
         const val DEFAULT_FAILURE_CODE = 504
