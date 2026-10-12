@@ -10,8 +10,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.InterruptedIOException
-import java.util.Random
-import kotlin.math.abs
+import kotlin.random.Random
 
 /**
  * Answers every request with the contents of a local JSON file instead of hitting the network.
@@ -22,35 +21,21 @@ import kotlin.math.abs
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
  *
+ * Instances are immutable and safe to share between threads.
+ *
  * @param inputStreamProvider where mock files are read from.
- * @param failurePercentage chance, from 0 to 100, of answering with a 504 and an empty body.
- * @param basePath prefix added to every resolved file path.
- * @param minDelayMilliseconds lower bound of the simulated latency.
- * @param maxDelayMilliseconds upper bound, exclusive, of the simulated latency. Equal bounds give a fixed latency.
+ * @property failurePercentage chance, from 0 to 100, of answering with a 504 and an empty body.
+ * @property basePath prefix added to every resolved file path.
+ * @property minDelayMilliseconds lower bound of the simulated latency.
+ * @property maxDelayMilliseconds upper bound, exclusive, of the simulated latency. Equal bounds give a fixed latency.
  */
 public class OkHttpMockInterceptor(
     private val inputStreamProvider: InputStreamProvider,
-    failurePercentage: Int,
-    basePath: String,
-    minDelayMilliseconds: Int,
-    maxDelayMilliseconds: Int,
+    public val failurePercentage: Int,
+    public val basePath: String,
+    public val minDelayMilliseconds: Int,
+    public val maxDelayMilliseconds: Int,
 ) : Interceptor {
-
-    /** Chance, from 0 to 100, of answering with a failure status. */
-    public var failurePercentage: Int = failurePercentage
-        private set
-
-    /** Prefix added to every resolved file path. */
-    public var basePath: String = basePath
-        private set
-
-    /** Lower bound of the simulated latency. */
-    public var minDelayMilliseconds: Int = minDelayMilliseconds
-        private set
-
-    /** Upper bound, exclusive, of the simulated latency. */
-    public var maxDelayMilliseconds: Int = maxDelayMilliseconds
-        private set
 
     init {
         require(failurePercentage in 0..100) { "failurePercentage must be between 0 and 100: $failurePercentage" }
@@ -103,8 +88,7 @@ public class OkHttpMockInterceptor(
                 "Tried: ${candidates.joinToString()}"
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
-        val failure = abs(Random().nextInt() % 100) < failurePercentage
-        if (failure) {
+        if (Random.nextInt(100) < failurePercentage) {
             print("JsonMockServer: Simulated failure for ${candidates.first()}\t\tStatusCode : $HTTP_GATEWAY_TIMEOUT")
             return response(request, HTTP_GATEWAY_TIMEOUT, ByteArray(0), CONTENT_TYPE_JSON)
         }
@@ -155,28 +139,8 @@ public class OkHttpMockInterceptor(
     /** A latency in `[min, max)`, or exactly `min` when both bounds are equal. */
     private fun nextDelayMilliseconds(): Long {
         val window = maxDelayMilliseconds - minDelayMilliseconds
-        val jitter = if (window > 0) Random().nextInt(window) else 0
+        val jitter = if (window > 0) Random.nextInt(window) else 0
         return (minDelayMilliseconds + jitter).toLong()
-    }
-
-    /** Changes [failurePercentage]. */
-    public fun setFailurePercentage(failurePercentage: Int): OkHttpMockInterceptor = apply {
-        this.failurePercentage = failurePercentage
-    }
-
-    /** Changes [basePath]. */
-    public fun setBasePath(basePath: String): OkHttpMockInterceptor = apply {
-        this.basePath = basePath
-    }
-
-    /** Changes [minDelayMilliseconds]. */
-    public fun setMinDelayMilliseconds(minDelayMilliseconds: Int): OkHttpMockInterceptor = apply {
-        this.minDelayMilliseconds = minDelayMilliseconds
-    }
-
-    /** Changes [maxDelayMilliseconds]. */
-    public fun setMaxDelayMilliseconds(maxDelayMilliseconds: Int): OkHttpMockInterceptor = apply {
-        this.maxDelayMilliseconds = maxDelayMilliseconds
     }
 
     private companion object {

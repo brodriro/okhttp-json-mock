@@ -8,6 +8,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.InterruptedIOException
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
@@ -312,6 +314,22 @@ class OkHttpMockInterceptorTest {
 
         assertEquals(USERS, response.body!!.string())
         assertEquals(listOf("api/v1/users.json"), provider.requestedPaths)
+    }
+
+    @Test
+    fun `one instance serves concurrent calls`() {
+        val provider = InputStreamProvider { path -> USER.takeIf { path == "api/v1/users/1.json" }?.byteInputStream() }
+        val client = clientFor(provider)
+        val pool = Executors.newFixedThreadPool(8)
+
+        val codes = try {
+            pool.invokeAll(List(200) { Callable { client.get("http://example.com/api/v1/users/1").use { it.code } } })
+                .map { it.get() }
+        } finally {
+            pool.shutdownNow()
+        }
+
+        assertEquals(setOf(200), codes.toSet())
     }
 
     private companion object {
