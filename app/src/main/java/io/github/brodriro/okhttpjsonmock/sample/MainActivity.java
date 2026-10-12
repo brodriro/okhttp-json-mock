@@ -82,9 +82,9 @@ public class MainActivity extends AppCompatActivity {
             try {
                 return getAssets().open(path);
             } catch (IOException e) {
-                e.printStackTrace();
+                // No asset at this path: the interceptor moves on to its next candidate.
+                return null;
             }
-            return null;
         };
     }
 
