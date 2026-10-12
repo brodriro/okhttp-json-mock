@@ -45,6 +45,8 @@ The method suffix is the HTTP method in lower case (`.get`, `.post`, `.put`, `.d
 
 With several query parameters the exact string is tried first (`page=1&categoryId=5`) and then the same parameters sorted (`categoryId=5&page=1`), in both the method and the shared group. `basePath` is prepended to every candidate. Leading and trailing slashes are trimmed, and the root path `/` is looked up as `index`.
 
+A mock is answered as it is with status 200. To answer with another status the file wraps the response in an envelope read by `MockEnvelope` with Gson: `{ "statusCode": 201, "response": { ... } }` answers 201 with the `response` value as the body, and `{ "statusCode": 204 }` answers with no body. A file is an envelope only when it is an object that has `statusCode` and no keys other than `statusCode` and `response`; everything else, including a real payload with a `statusCode` field plus other keys, is served untouched. An envelope whose `statusCode` is not an HTTP status fails the call with an `IOException` naming the file.
+
 Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `getAssets().open(path)` (see `MainActivity.getAndroidProvider`). A provider signals "not found" by returning `null`.
 
 Behaviours that are easy to miss:
@@ -55,7 +57,9 @@ Behaviours that are easy to miss:
 - No matching file → 404 with a `text/plain` body listing the files that were tried. This wins over the simulated failure.
 - `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
 - Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms); equal bounds give a fixed delay. An interrupt during the sleep throws `InterruptedIOException`.
-- The file is returned byte for byte as `application/json`; the status line carries the standard reason phrase.
+- A plain mock is returned byte for byte as `application/json`; an envelope's `response` is re-serialised by Gson (compact, nulls and number text preserved). The status line carries the standard reason phrase.
+- Response headers cannot be mocked: the envelope has no `headers` key by decision. It can be added later without breaking existing files.
+- Gson is an `implementation` dependency used only by `MockEnvelope`; files that do not contain the text `statusCode` are never parsed.
 - Instances are immutable. They are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
 - Each call logs one line through `MockLogger` (`STDOUT` by default, `NONE` to silence).
 - Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`) throws `IllegalArgumentException` at construction.
