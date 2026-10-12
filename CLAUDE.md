@@ -22,7 +22,13 @@ Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions
 ./gradlew :okhttpjsonmock:publishToMavenLocal  # jar + sources + javadoc + pom into ~/.m2
 ```
 
-There are no tests and no lint configuration in the repo yet. Once tests are added to the library, a single one runs with `./gradlew :okhttpjsonmock:test --tests 'fully.qualified.ClassName.method'`.
+The library has JUnit 5 tests written in Kotlin under `okhttpjsonmock/src/test/kotlin` (the main sources are still Java). They drive the interceptor through a real `OkHttpClient` with an in-memory `InputStreamProvider`.
+
+```sh
+./gradlew :okhttpjsonmock:test                                              # all library tests
+./gradlew :okhttpjsonmock:test --tests 'ir.mirrajabi.okhttpjsonmock.OkHttpMockInterceptorTest'
+./gradlew build                                                             # compile + tests + Android lint
+```
 
 The library version is set in `okhttpjsonmock/build.gradle.kts` and must be kept in sync with the README (dependency snippet and Changelog) on release. Publishing goes through the `com.vanniktech.maven.publish` plugin; signing is only enabled when a signing key is configured.
 
