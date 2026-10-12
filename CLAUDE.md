@@ -8,29 +8,29 @@ A small JVM library that mocks HTTP responses for OkHttp/Retrofit: an OkHttp `In
 
 ## Modules
 
-- `okhttpjsonmock/` — the library. Plain `java-library`, Java 8 bytecode, published as `io.github.brodriro:okhttp-json-mock`.
-- `app/` — Android sample app (Retrofit + RxJava2, AndroidX) that consumes the library via `project(":okhttpjsonmock")`. Its mock data lives in `app/src/main/assets/api/v1/...`.
+- `okhttp-json-mock/` — the library. Plain `java-library`, Java 8 bytecode, published as `io.github.brodriro:okhttp-json-mock`.
+- `app/` — Android sample app (Retrofit + RxJava2, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...`.
 
 ## Commands
 
 Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions in `gradle/libs.versions.toml`. Needs JDK 17+ (21 is what is installed locally). `app` also needs an Android SDK (`ANDROID_HOME` or `local.properties`) with platform 36.
 
 ```sh
-./gradlew :okhttpjsonmock:build                # build the library only
+./gradlew :okhttp-json-mock:build                # build the library only
 ./gradlew :app:assembleDebug                   # build the sample app
 ./gradlew :app:installDebug                    # install the sample on a connected device
-./gradlew :okhttpjsonmock:publishToMavenLocal  # jar + sources + javadoc + pom into ~/.m2
+./gradlew :okhttp-json-mock:publishToMavenLocal  # jar + sources + javadoc + pom into ~/.m2
 ```
 
-The library has JUnit 5 tests written in Kotlin under `okhttpjsonmock/src/test/kotlin` (the main sources are still Java). They drive the interceptor through a real `OkHttpClient` with an in-memory `InputStreamProvider`.
+The library has JUnit 5 tests written in Kotlin under `okhttp-json-mock/src/test/kotlin` (the main sources are still Java). They drive the interceptor through a real `OkHttpClient` with an in-memory `InputStreamProvider`.
 
 ```sh
-./gradlew :okhttpjsonmock:test                                              # all library tests
-./gradlew :okhttpjsonmock:test --tests 'ir.mirrajabi.okhttpjsonmock.OkHttpMockInterceptorTest'
+./gradlew :okhttp-json-mock:test                                              # all library tests
+./gradlew :okhttp-json-mock:test --tests 'ir.mirrajabi.okhttpjsonmock.OkHttpMockInterceptorTest'
 ./gradlew build                                                             # compile + tests + Android lint
 ```
 
-The library version is set in `okhttpjsonmock/build.gradle.kts` and must be kept in sync with the README (dependency snippet and Changelog) on release. Publishing goes through the `com.vanniktech.maven.publish` plugin; signing is only enabled when a signing key is configured.
+The library version is set in `okhttp-json-mock/build.gradle.kts` and must be kept in sync with the README (dependency snippet and Changelog) on release. Publishing goes through the `com.vanniktech.maven.publish` plugin; signing is only enabled when a signing key is configured.
 
 ## How the interceptor resolves a request
 

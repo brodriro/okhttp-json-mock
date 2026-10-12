@@ -28,7 +28,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":okhttpjsonmock"))
+    implementation(project(":okhttp-json-mock"))
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.recyclerview)
 
