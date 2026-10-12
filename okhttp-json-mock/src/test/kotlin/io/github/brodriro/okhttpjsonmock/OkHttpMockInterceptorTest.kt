@@ -7,6 +7,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -190,6 +191,28 @@ class OkHttpMockInterceptorTest {
 
         assertFailsWith<IllegalArgumentException> { OkHttpMockInterceptor(provider, 0, 10, 5) }
         assertFailsWith<IllegalArgumentException> { OkHttpMockInterceptor(provider, 0, -1, 5) }
+    }
+
+    @Test
+    fun `missing mock answers 404 and names the files that were tried`() {
+        val provider = FakeProvider(emptyMap())
+
+        val response = clientFor(provider).get("http://example.com/api/v1/users?page=1")
+
+        assertEquals(404, response.code)
+        val body = response.body!!.string()
+        assertContains(body, "GET /api/v1/users")
+        assertContains(body, "api/v1/users/page=1.json")
+        assertContains(body, "api/v1/users.json")
+        assertEquals(listOf("api/v1/users/page=1.json", "api/v1/users.json"), provider.requestedPaths)
+    }
+
+    @Test
+    fun `missing mock answers 404 even when every call is set to fail`() {
+        val response = clientFor(FakeProvider(emptyMap()), failurePercentage = 100)
+            .get("http://example.com/api/v1/users/1")
+
+        assertEquals(404, response.code)
     }
 
     private companion object {
