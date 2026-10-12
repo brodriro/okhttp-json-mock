@@ -51,6 +51,7 @@ public class OkHttpMockInterceptor(
         private set
 
     init {
+        require(failurePercentage in 0..100) { "failurePercentage must be between 0 and 100: $failurePercentage" }
         require(minDelayMilliseconds >= 0) { "minDelayMilliseconds must not be negative: $minDelayMilliseconds" }
         require(maxDelayMilliseconds >= minDelayMilliseconds) {
             "maxDelayMilliseconds ($maxDelayMilliseconds) must not be lower than " +

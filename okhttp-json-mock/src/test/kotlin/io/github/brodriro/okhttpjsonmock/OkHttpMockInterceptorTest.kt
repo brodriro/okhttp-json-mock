@@ -238,6 +238,14 @@ class OkHttpMockInterceptorTest {
         assertEquals("", response.body!!.string())
     }
 
+    @Test
+    fun `failure percentage outside 0 to 100 is rejected`() {
+        val provider = FakeProvider(emptyMap())
+
+        assertFailsWith<IllegalArgumentException> { OkHttpMockInterceptor(provider, -1) }
+        assertFailsWith<IllegalArgumentException> { OkHttpMockInterceptor(provider, 101) }
+    }
+
     private companion object {
         const val USER = """{"id":1,"name":"John"}"""
         const val NUMBERS = """["0123456789"]"""
