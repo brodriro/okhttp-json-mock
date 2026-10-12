@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">OkhttpJsonMock</string>
+    <string name="user_id">Id: %1$d</string>
+    <string name="user_name">Name: %1$s</string>
+    <string name="user_last_name">Last name: %1$s</string>
+    <string name="user_age">Age: %1$d</string>
+    <string name="user_numbers">Phone numbers: %1$s</string>
 </resources>
