@@ -8,7 +8,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.ByteArrayOutputStream
-import java.io.IOException
 import java.io.InterruptedIOException
 import java.io.PrintStream
 import java.util.concurrent.Callable
@@ -29,9 +28,6 @@ class OkHttpMockInterceptorTest {
     /** Serves mocks from memory and records every path the interceptor asks for. */
     private class FakeProvider(private val files: Map<String, String>) : InputStreamProvider {
         val requestedPaths = mutableListOf<String>()
-
-        /** The `.json` lookups, without the `.meta` lookup that goes with each of them. */
-        val requestedMocks get() = requestedPaths.filter { it.endsWith(".json") }
 
         override fun provide(path: String) = files[path]
             .also { requestedPaths += path }
@@ -59,7 +55,7 @@ class OkHttpMockInterceptorTest {
 
         assertEquals(200, response.code)
         assertEquals(USER, response.body!!.string())
-        assertEquals(listOf("api/v1/users/1.get.json", "api/v1/users/1.json"), provider.requestedMocks)
+        assertEquals(listOf("api/v1/users/1.get.json", "api/v1/users/1.json"), provider.requestedPaths)
     }
 
     @Test
@@ -78,7 +74,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users?page=1")
 
         assertEquals(USERS, response.body!!.string())
-        assertEquals("api/v1/users/page=1.json", provider.requestedMocks.last())
+        assertEquals("api/v1/users/page=1.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -118,7 +114,7 @@ class OkHttpMockInterceptorTest {
                 "api/v1/users/page=7.json",
                 "api/v1/users.json",
             ),
-            provider.requestedMocks,
+            provider.requestedPaths,
         )
     }
 
@@ -225,7 +221,7 @@ class OkHttpMockInterceptorTest {
         assertContains(body, "api/v1/users/page=1.json")
         assertContains(body, "api/v1/users.json")
         assertContains(body, "api/v1/users.get.json")
-        assertEquals(4, provider.requestedMocks.size)
+        assertEquals(4, provider.requestedPaths.size)
     }
 
     @Test
@@ -318,7 +314,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/")
 
         assertEquals(USER, response.body!!.string())
-        assertEquals("index.json", provider.requestedMocks.last())
+        assertEquals("index.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -328,7 +324,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users/")
 
         assertEquals(USERS, response.body!!.string())
-        assertEquals("api/v1/users.json", provider.requestedMocks.last())
+        assertEquals("api/v1/users.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -370,7 +366,7 @@ class OkHttpMockInterceptorTest {
         val response = client.get("http://example.com/api/v1/users/1")
 
         assertEquals(504, response.code)
-        assertEquals("mocks/api/v1/users/1.json", provider.requestedMocks.last())
+        assertEquals("mocks/api/v1/users/1.json", provider.requestedPaths.last())
         assertEquals(0, interceptor.maxDelayMilliseconds)
     }
 
@@ -537,117 +533,6 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/posts?page=1&categoryId=5")
 
         assertEquals(USER, response.body!!.string())
-    }
-
-    @Test
-    fun `meta file sets the status code and headers of its mock`() {
-        val provider = FakeProvider(
-            mapOf(
-                "api/v1/users.post.json" to USER,
-                "api/v1/users.post.meta" to "status: 201\nLocation: /api/v1/users/1",
-            ),
-        )
-
-        val response = clientFor(provider).send("POST", "http://example.com/api/v1/users")
-
-        assertEquals(201, response.code)
-        assertEquals("Created", response.message)
-        assertEquals("/api/v1/users/1", response.header("Location"))
-        assertEquals("application/json", response.header("content-type"))
-        assertEquals(USER, response.body!!.string())
-    }
-
-    @Test
-    fun `meta file on its own answers with an empty body`() {
-        val provider = FakeProvider(mapOf("api/v1/users/1.delete.meta" to "status: 204"))
-
-        val response = clientFor(provider).send("DELETE", "http://example.com/api/v1/users/1")
-
-        assertEquals(204, response.code)
-        assertEquals("No Content", response.message)
-        assertEquals("", response.body!!.string())
-    }
-
-    @Test
-    fun `meta file only applies to the mock it is named after`() {
-        val provider = FakeProvider(
-            mapOf(
-                "api/v1/users.json" to USERS,
-                "api/v1/users.post.json" to USER,
-                "api/v1/users.post.meta" to "status: 201",
-            ),
-        )
-        val client = clientFor(provider)
-
-        assertEquals(201, client.send("POST", "http://example.com/api/v1/users").code)
-        assertEquals(200, client.send("GET", "http://example.com/api/v1/users").code)
-    }
-
-    @Test
-    fun `meta file of a mock shared by every method applies to all of them`() {
-        val provider = FakeProvider(
-            mapOf(
-                "api/v1/login.json" to """{"error":"bad credentials"}""",
-                "api/v1/login.meta" to "status: 401\nWWW-Authenticate: Bearer",
-            ),
-        )
-
-        val response = clientFor(provider).send("POST", "http://example.com/api/v1/login")
-
-        assertEquals(401, response.code)
-        assertEquals("Bearer", response.header("WWW-Authenticate"))
-        assertEquals("""{"error":"bad credentials"}""", response.body!!.string())
-    }
-
-    @Test
-    fun `meta file can change the content type`() {
-        val provider = FakeProvider(
-            mapOf(
-                "api/v1/health.json" to "ok",
-                "api/v1/health.meta" to "Content-Type: text/plain",
-            ),
-        )
-
-        val response = clientFor(provider).get("http://example.com/api/v1/health")
-
-        assertEquals("text/plain", response.header("content-type"))
-        assertEquals("text", response.body!!.contentType()!!.type)
-    }
-
-    @Test
-    fun `invalid meta file fails the call naming the file`() {
-        val provider = FakeProvider(
-            mapOf(
-                "api/v1/users.post.json" to USER,
-                "api/v1/users.post.meta" to "status: created",
-            ),
-        )
-
-        val error = assertFailsWith<IOException> {
-            clientFor(provider).send("POST", "http://example.com/api/v1/users")
-        }
-
-        assertContains(error.message!!, "api/v1/users.post.meta:1")
-    }
-
-    @Test
-    fun `simulated failure wins over the status in the meta file`() {
-        val provider = FakeProvider(
-            mapOf(
-                "api/v1/users.post.json" to USER,
-                "api/v1/users.post.meta" to "status: 201\nLocation: /api/v1/users/1",
-            ),
-        )
-
-        val response = clientFor(provider, failurePercentage = 100).send("POST", "http://example.com/api/v1/users")
-
-        assertEquals(504, response.code)
-        assertEquals(null, response.header("Location"))
-    }
-
-    private fun OkHttpClient.send(method: String, url: String): Response {
-        val body = if (method == "GET") null else "{}".toRequestBody("application/json".toMediaType())
-        return newCall(Request.Builder().url(url).method(method, body).build()).execute()
     }
 
     private companion object {

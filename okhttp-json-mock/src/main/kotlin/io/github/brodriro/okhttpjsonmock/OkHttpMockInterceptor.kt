@@ -3,7 +3,7 @@ package io.github.brodriro.okhttpjsonmock
 import io.github.brodriro.okhttpjsonmock.providers.DefaultInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import okhttp3.Interceptor
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
@@ -19,10 +19,6 @@ import kotlin.random.Random
  * `api/v1/users.json`, in that order. A file with a method suffix (`users.post.json`) only answers
  * that method, so one URL can have a different mock per method; a file without it answers any
  * method. Host, headers and body are ignored.
- *
- * A mock answers with status 200 unless a plain-text `.meta` file with the same name sets another
- * status or adds headers: `users.post.meta` containing `status: 201` and `Location: /users/4`
- * applies to `users.post.json`. A `.meta` file without a `.json` file answers with an empty body.
  * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
@@ -105,7 +101,7 @@ public class OkHttpMockInterceptor private constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val candidates = resolver.candidates(request.method, request.url)
-        val match = candidates.firstNotNullOfOrNull(::findMock)
+        val match = candidates.firstNotNullOfOrNull { path -> readMock(path)?.let { path to it } }
         try {
             Thread.sleep(nextDelayMilliseconds())
         } catch (e: InterruptedException) {
@@ -116,55 +112,30 @@ public class OkHttpMockInterceptor private constructor(
         if (match == null) {
             val tried = candidates.joinToString()
             logger.log("$call -> $HTTP_NOT_FOUND, no mock found. Tried: $tried")
-            val explanation = "No mock file found for $call. Tried: $tried " +
-                "(and the same names ending in .meta instead of .json)"
+            val explanation = "No mock file found for $call. Tried: $tried"
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
+        val (path, mock) = match
         if (Random.nextInt(100) < failurePercentage) {
             logger.log("$call -> $failureCode, simulated failure")
             return response(request, failureCode, ByteArray(0), CONTENT_TYPE_JSON)
         }
-        val meta = match.meta
-        logger.log("$call -> ${meta.status} from ${match.source}")
-        return response(request, meta.status, match.body, meta.contentType ?: CONTENT_TYPE_JSON, meta.headers)
-    }
-
-    /** A mock that answers the request: its body, its status and headers, and the file it came from. */
-    private class MockMatch(val source: String, val body: ByteArray, val meta: MockMeta)
-
-    /**
-     * Reads [mockFile] and its optional `.meta` file. Either one is enough: a `.meta` file on its
-     * own gives a response with no body, which is how a `204 No Content` is mocked.
-     */
-    private fun findMock(mockFile: String): MockMatch? {
-        val metaFile = resolver.metaFileFor(mockFile)
-        val body = readMock(mockFile)
-        val meta = readMock(metaFile)?.let { MockMeta.parse(it.decodeToString(), metaFile) }
-        if (body == null && meta == null) return null
-        val source = if (body != null) mockFile else metaFile
-        return MockMatch(source, body ?: ByteArray(0), meta ?: MockMeta.DEFAULT)
+        logger.log("$call -> $HTTP_OK from $path")
+        return response(request, HTTP_OK, mock, CONTENT_TYPE_JSON)
     }
 
     /** The raw bytes of the mock at [path], or `null` when the provider has no such file. */
     private fun readMock(path: String): ByteArray? = inputStreamProvider.provide(path)?.use { it.readBytes() }
 
-    private fun response(
-        request: Request,
-        code: Int,
-        body: ByteArray,
-        contentType: String,
-        headers: List<Pair<String, String>> = emptyList(),
-    ): Response {
-        val builder = Response.Builder()
+    private fun response(request: Request, code: Int, body: ByteArray, contentType: String): Response =
+        Response.Builder()
             .code(code)
             .message(reasonPhrase(code))
             .request(request)
             .protocol(Protocol.HTTP_1_1)
-            .body(body.toResponseBody(contentType.toMediaTypeOrNull()))
+            .body(body.toResponseBody(contentType.toMediaType()))
             .addHeader("content-type", contentType)
-        headers.forEach { (name, value) -> builder.addHeader(name, value) }
-        return builder.build()
-    }
+            .build()
 
     private fun reasonPhrase(code: Int): String = when (code) {
         200 -> "OK"
