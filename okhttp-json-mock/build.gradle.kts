@@ -39,6 +39,13 @@ tasks.test {
     inputs.dir(rootProject.file("app/src/main/assets")).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
+// The Apache License asks redistributions to carry the license and the attribution notice.
+tasks.withType<Jar>().configureEach {
+    from(rootProject.files("LICENSE", "NOTICE")) {
+        into("META-INF")
+    }
+}
+
 mavenPublishing {
     coordinates(group.toString(), "okhttp-json-mock", version.toString())
     publishToMavenCentral()
