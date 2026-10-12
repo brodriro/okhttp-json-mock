@@ -45,17 +45,20 @@ The method suffix is the HTTP method in lower case (`.get`, `.post`, `.put`, `.d
 
 With several query parameters the exact string is tried first (`page=1&categoryId=5`) and then the same parameters sorted (`categoryId=5&page=1`), in both the method and the shared group. `basePath` is prepended to every candidate. Leading and trailing slashes are trimmed, and the root path `/` is looked up as `index`.
 
+Next to each candidate the interceptor also looks for a plain-text `.meta` file with the same name (`users.post.meta` for `users.post.json`), parsed by `MockMeta`: one `Name: value` per line, `status` sets the HTTP status, any other name is a response header, `#` starts a comment. A candidate matches when either file exists; a `.meta` on its own answers with an empty body (the way to mock a 204). A malformed `.meta` fails the call with an `IOException` naming the file and line.
+
 Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `getAssets().open(path)` (see `MainActivity.getAndroidProvider`). A provider signals "not found" by returning `null`.
 
 Behaviours that are easy to miss:
 
 - Host, headers and request body are ignored; only method, path and query select the file.
-- Every miss costs one provider call, so a request can make up to six lookups. Providers must return `null` quietly for a missing file.
+- Every candidate costs two provider calls (`.json` and `.meta`), so a request that misses everything makes up to twelve. Providers must return `null` quietly for a missing file.
+- The library has no JSON parser on purpose; that is why `.meta` is plain text.
 - The real network is never hit: `chain.proceed` is not called.
 - No matching file → 404 with a `text/plain` body listing the files that were tried. This wins over the simulated failure.
 - `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
 - Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms); equal bounds give a fixed delay. An interrupt during the sleep throws `InterruptedIOException`.
-- The file is returned byte for byte as `application/json`; the status line carries the standard reason phrase.
+- The file is returned byte for byte, as `application/json` with status 200 unless its `.meta` says otherwise; the status line carries the standard reason phrase.
 - Instances are immutable. They are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
 - Each call logs one line through `MockLogger` (`STDOUT` by default, `NONE` to silence).
 - Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`) throws `IllegalArgumentException` at construction.
