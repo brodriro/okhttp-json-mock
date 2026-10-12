@@ -34,19 +34,23 @@ The library version is set in `okhttp-json-mock/build.gradle.kts` and must be ke
 
 ## How the interceptor resolves a request
 
-All logic is in `OkHttpMockInterceptor.intercept` (`io.github.brodriro.okhttpjsonmock`). `candidatePaths` builds the lookup, most specific first:
+`OkHttpMockInterceptor.intercept` (`io.github.brodriro.okhttpjsonmock`) asks `MockFileResolver.candidates(method, url)` for the files that can answer the request and uses the first one the provider has. For `GET /api/v1/users?page=1` the order is:
 
-1. `basePath + <encodedPath> + "/" + <encodedQuery> + ".json"` — only when there is a query string.
-   e.g. `GET /api/v1/users?page=1` → `api/v1/users/page=1.json`; multiple params keep the URL's `&` order: `page=1&categoryId=5.json`.
-2. Fallback: `basePath + <encodedPath> + ".json"`, e.g. `/api/v1/users/1` → `api/v1/users/1.json`.
+1. `api/v1/users/page=1.get.json` — this method, this query.
+2. `api/v1/users.get.json` — this method, any query.
+3. `api/v1/users/page=1.json` — any method, this query.
+4. `api/v1/users.json` — any method, any query.
 
-Leading and trailing slashes are trimmed, and the root path `/` is looked up as `index.json`.
+The method suffix is the HTTP method in lower case (`.get`, `.post`, `.put`, `.delete`, `.patch`, …). Files without it answer every method, which keeps 3.0 mocks working and is how one URL gets a different mock per method.
+
+With several query parameters the exact string is tried first (`page=1&categoryId=5`) and then the same parameters sorted (`categoryId=5&page=1`), in both the method and the shared group. `basePath` is prepended to every candidate. Leading and trailing slashes are trimmed, and the root path `/` is looked up as `index`.
 
 Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `getAssets().open(path)` (see `MainActivity.getAndroidProvider`). A provider signals "not found" by returning `null`.
 
 Behaviours that are easy to miss:
 
-- Host, HTTP method, headers and request body are ignored; only path and query select the file. Method-aware lookup is phase 3 of the roadmap.
+- Host, headers and request body are ignored; only method, path and query select the file.
+- Every miss costs one provider call, so a request can make up to six lookups. Providers must return `null` quietly for a missing file.
 - The real network is never hit: `chain.proceed` is not called.
 - No matching file → 404 with a `text/plain` body listing the files that were tried. This wins over the simulated failure.
 - `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
