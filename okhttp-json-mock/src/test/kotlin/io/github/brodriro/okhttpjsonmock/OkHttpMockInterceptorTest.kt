@@ -215,6 +215,19 @@ class OkHttpMockInterceptorTest {
         assertEquals(404, response.code)
     }
 
+    @Test
+    fun `status line carries the reason phrase and not the file contents`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to USER))
+
+        val ok = clientFor(provider).get("http://example.com/api/v1/users/1")
+        val failed = clientFor(provider, failurePercentage = 100).get("http://example.com/api/v1/users/1")
+        val missing = clientFor(provider).get("http://example.com/api/v1/unknown")
+
+        assertEquals("OK", ok.message)
+        assertEquals("Gateway Timeout", failed.message)
+        assertEquals("Not Found", missing.message)
+    }
+
     private companion object {
         const val USER = """{"id":1,"name":"John"}"""
         const val NUMBERS = """["0123456789"]"""

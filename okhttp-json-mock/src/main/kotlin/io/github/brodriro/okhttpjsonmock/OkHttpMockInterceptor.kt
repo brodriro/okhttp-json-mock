@@ -97,12 +97,12 @@ public class OkHttpMockInterceptor(
             print("JsonMockServer: No mock found for ${request.url.encodedPath}\t\tStatusCode : $HTTP_NOT_FOUND")
             val explanation = "No mock file found for ${request.method} ${request.url.encodedPath}. " +
                 "Tried: ${candidates.joinToString()}"
-            return response(request, HTTP_NOT_FOUND, "Not Found", explanation, CONTENT_TYPE_TEXT)
+            return response(request, HTTP_NOT_FOUND, explanation, CONTENT_TYPE_TEXT)
         }
         val failure = abs(Random().nextInt() % 100) < failurePercentage
         val statusCode = if (failure) 504 else 200
         print("JsonMockServer: Returning result from ${candidates.first()}\t\tStatusCode : $statusCode")
-        return response(request, statusCode, mock, mock, CONTENT_TYPE_JSON)
+        return response(request, statusCode, mock, CONTENT_TYPE_JSON)
     }
 
     /** Files that can answer [url], most specific first. */
@@ -113,15 +113,34 @@ public class OkHttpMockInterceptor(
         return listOfNotNull(queryFile, "$basePath$path.json")
     }
 
-    private fun response(request: Request, code: Int, message: String, body: String, contentType: String): Response =
+    private fun response(request: Request, code: Int, body: String, contentType: String): Response =
         Response.Builder()
             .code(code)
-            .message(message)
+            .message(reasonPhrase(code))
             .request(request)
             .protocol(Protocol.HTTP_1_0)
             .body(body.toResponseBody(contentType.toMediaType()))
             .addHeader("content-type", contentType)
             .build()
+
+    private fun reasonPhrase(code: Int): String = when (code) {
+        200 -> "OK"
+        201 -> "Created"
+        202 -> "Accepted"
+        204 -> "No Content"
+        400 -> "Bad Request"
+        401 -> "Unauthorized"
+        403 -> "Forbidden"
+        404 -> "Not Found"
+        409 -> "Conflict"
+        422 -> "Unprocessable Entity"
+        429 -> "Too Many Requests"
+        500 -> "Internal Server Error"
+        502 -> "Bad Gateway"
+        503 -> "Service Unavailable"
+        504 -> "Gateway Timeout"
+        else -> "Mock Response"
+    }
 
     /** A latency in `[min, max)`, or exactly `min` when both bounds are equal. */
     private fun nextDelayMilliseconds(): Long {
