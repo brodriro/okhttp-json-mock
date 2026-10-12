@@ -8,48 +8,53 @@ A small JVM library that mocks HTTP responses for OkHttp/Retrofit: an OkHttp `In
 
 ## Modules
 
-- `okhttpjsonmock/` — the library. Plain `java-library`, Java 8 bytecode, published as `io.github.brodriro:okhttp-json-mock`.
-- `app/` — Android sample app (Retrofit + RxJava2, AndroidX) that consumes the library via `project(":okhttpjsonmock")`. Its mock data lives in `app/src/main/assets/api/v1/...`.
+- `okhttp-json-mock/` — the library. Kotlin (`explicitApi`), Java 8 bytecode, published as `io.github.brodriro:okhttp-json-mock`.
+- `app/` — Android sample app (Retrofit + RxJava2, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...`.
 
 ## Commands
 
 Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions in `gradle/libs.versions.toml`. Needs JDK 17+ (21 is what is installed locally). `app` also needs an Android SDK (`ANDROID_HOME` or `local.properties`) with platform 36.
 
 ```sh
-./gradlew :okhttpjsonmock:build                # build the library only
+./gradlew :okhttp-json-mock:build                # build the library only
 ./gradlew :app:assembleDebug                   # build the sample app
 ./gradlew :app:installDebug                    # install the sample on a connected device
-./gradlew :okhttpjsonmock:publishToMavenLocal  # jar + sources + javadoc + pom into ~/.m2
+./gradlew :okhttp-json-mock:publishToMavenLocal  # jar + sources + javadoc + pom into ~/.m2
 ```
 
-The library has JUnit 5 tests written in Kotlin under `okhttpjsonmock/src/test/kotlin` (the main sources are still Java). They drive the interceptor through a real `OkHttpClient` with an in-memory `InputStreamProvider`.
+The library has JUnit 5 tests written in Kotlin under `okhttp-json-mock/src/test/kotlin`. They drive the interceptor through a real `OkHttpClient` with an in-memory `InputStreamProvider`.
 
 ```sh
-./gradlew :okhttpjsonmock:test                                              # all library tests
-./gradlew :okhttpjsonmock:test --tests 'ir.mirrajabi.okhttpjsonmock.OkHttpMockInterceptorTest'
+./gradlew :okhttp-json-mock:test                                              # all library tests
+./gradlew :okhttp-json-mock:test --tests 'io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptorTest'
 ./gradlew build                                                             # compile + tests + Android lint
 ```
 
-The library version is set in `okhttpjsonmock/build.gradle.kts` and must be kept in sync with the README (dependency snippet and Changelog) on release. Publishing goes through the `com.vanniktech.maven.publish` plugin; signing is only enabled when a signing key is configured.
+The library version is set in `okhttp-json-mock/build.gradle.kts` and must be kept in sync with the README (dependency snippet and Changelog) on release. Publishing goes through the `com.vanniktech.maven.publish` plugin; signing is only enabled when a signing key is configured.
 
 ## How the interceptor resolves a request
 
-All logic is in `OkHttpMockInterceptor.intercept`. The lookup is:
+All logic is in `OkHttpMockInterceptor.intercept` (`io.github.brodriro.okhttpjsonmock`). `candidatePaths` builds the lookup, most specific first:
 
-1. `basePath + <encodedPath without leading slash> + "/" + <encodedQuery> + ".json"` — only when there is a query string.
+1. `basePath + <encodedPath> + "/" + <encodedQuery> + ".json"` — only when there is a query string.
    e.g. `GET /api/v1/users?page=1` → `api/v1/users/page=1.json`; multiple params keep the URL's `&` order: `page=1&categoryId=5.json`.
 2. Fallback: `basePath + <encodedPath> + ".json"`, e.g. `/api/v1/users/1` → `api/v1/users/1.json`.
 
-The resulting relative path is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `getAssets().open(path)` (see `MainActivity.getAndroidProvider`). A provider signals "not found" by returning `null`.
+Leading and trailing slashes are trimmed, and the root path `/` is looked up as `index.json`.
+
+Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `getAssets().open(path)` (see `MainActivity.getAndroidProvider`). A provider signals "not found" by returning `null`.
 
 Behaviours that are easy to miss:
 
-- Host, HTTP method, headers and request body are ignored; only path and query select the file.
+- Host, HTTP method, headers and request body are ignored; only path and query select the file. Method-aware lookup is phase 3 of the roadmap.
 - The real network is never hit: `chain.proceed` is not called.
-- Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms). `min == max` causes a modulo-by-zero `ArithmeticException`.
-- `failurePercentage` (0–100) is the chance of returning status 504 instead of 200. The body is still the file contents in both cases.
-- The file contents are also passed to `Response.Builder.message(...)`. When no file matches, that is `null`, so OkHttp throws `IllegalStateException` instead of returning an empty response.
-- Since 3.0 the JSON file is returned verbatim; there is no response wrapper object.
+- No matching file → 404 with a `text/plain` body listing the files that were tried. This wins over the simulated failure.
+- `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
+- Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms); equal bounds give a fixed delay. An interrupt during the sleep throws `InterruptedIOException`.
+- The file is returned byte for byte as `application/json`; the status line carries the standard reason phrase.
+- Instances are immutable. They are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
+- Each call logs one line through `MockLogger` (`STDOUT` by default, `NONE` to silence).
+- Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`) throws `IllegalArgumentException` at construction.
 
 ## Git workflow
 

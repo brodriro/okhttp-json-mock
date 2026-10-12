@@ -1,4 +1,4 @@
 jdk:
   - openjdk17
 install:
-  - ./gradlew :okhttpjsonmock:publishToMavenLocal
+  - ./gradlew :okhttp-json-mock:publishToMavenLocal
