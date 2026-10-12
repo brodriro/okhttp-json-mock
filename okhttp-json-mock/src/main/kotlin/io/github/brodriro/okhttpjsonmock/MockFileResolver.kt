@@ -21,8 +21,11 @@ internal class MockFileResolver(private val basePath: String) {
         val path = url.encodedPath.trim('/').ifEmpty { ROOT_FILE_NAME }
         val stems = queryVariants(url.encodedQuery).map { "$path/$it" } + path
         val suffix = method.lowercase(Locale.ROOT)
-        return stems.map { "$basePath$it.$suffix.json" } + stems.map { "$basePath$it.json" }
+        return stems.map { "$basePath$it.$suffix$MOCK_EXTENSION" } + stems.map { "$basePath$it$MOCK_EXTENSION" }
     }
+
+    /** The optional file with the status code and headers of [mockFile]: `users.post.meta` for `users.post.json`. */
+    fun metaFileFor(mockFile: String): String = mockFile.removeSuffix(MOCK_EXTENSION) + META_EXTENSION
 
     /**
      * The query string as sent and, when that is a different string, with its parameters sorted.
@@ -36,5 +39,7 @@ internal class MockFileResolver(private val basePath: String) {
 
     private companion object {
         const val ROOT_FILE_NAME = "index"
+        const val MOCK_EXTENSION = ".json"
+        const val META_EXTENSION = ".meta"
     }
 }

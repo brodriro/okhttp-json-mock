@@ -68,6 +68,14 @@ class MockFileResolverTest {
     }
 
     @Test
+    fun `meta file shares the name of its mock`() {
+        val resolver = MockFileResolver("")
+
+        assertEquals("api/v1/users.post.meta", resolver.metaFileFor("api/v1/users.post.json"))
+        assertEquals("api/v1/users/page=1.meta", resolver.metaFileFor("api/v1/users/page=1.json"))
+    }
+
+    @Test
     fun `base path prefixes every candidate`() {
         assertEquals(
             listOf("mocks/api/v1/users.delete.json", "mocks/api/v1/users.json"),
