@@ -3,6 +3,7 @@ package io.github.brodriro.okhttpjsonmock
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
@@ -262,6 +263,15 @@ class OkHttpMockInterceptorTest {
         } finally {
             Thread.interrupted()
         }
+    }
+
+    @Test
+    fun `responses report http 1_1`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to USER))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/users/1")
+
+        assertEquals(Protocol.HTTP_1_1, response.protocol)
     }
 
     private companion object {

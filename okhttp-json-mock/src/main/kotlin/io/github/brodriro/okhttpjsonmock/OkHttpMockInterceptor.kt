@@ -124,7 +124,7 @@ public class OkHttpMockInterceptor(
             .code(code)
             .message(reasonPhrase(code))
             .request(request)
-            .protocol(Protocol.HTTP_1_0)
+            .protocol(Protocol.HTTP_1_1)
             .body(body.toResponseBody(contentType.toMediaType()))
             .addHeader("content-type", contentType)
             .build()
