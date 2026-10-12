@@ -21,7 +21,8 @@ import kotlin.random.Random
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
  *
- * Instances are immutable and safe to share between threads.
+ * Instances are immutable and safe to share between threads. Create them with [Builder] or with one
+ * of the constructors kept from 3.0.
  *
  * @param inputStreamProvider where mock files are read from.
  * @property failurePercentage chance, from 0 to 100, of answering with a 504 and an empty body.
@@ -141,6 +142,50 @@ public class OkHttpMockInterceptor(
         val window = maxDelayMilliseconds - minDelayMilliseconds
         val jitter = if (window > 0) Random.nextInt(window) else 0
         return (minDelayMilliseconds + jitter).toLong()
+    }
+
+    /**
+     * Configures an [OkHttpMockInterceptor].
+     *
+     * Defaults: mocks are never failed on purpose, there is no base path and the latency is
+     * between 500 and 1500 ms.
+     *
+     * @param inputStreamProvider where mock files are read from.
+     */
+    public class Builder(private val inputStreamProvider: InputStreamProvider) {
+        private var failurePercentage = 0
+        private var basePath = DEFAULT_BASE_PATH
+        private var minDelayMilliseconds = DELAY_DEFAULT_MIN
+        private var maxDelayMilliseconds = DELAY_DEFAULT_MAX
+
+        /** Reads mocks from the filesystem. */
+        public constructor() : this(DefaultInputStreamProvider())
+
+        /** Chance, from 0 to 100, of answering with a failure instead of the mock. */
+        public fun failurePercentage(failurePercentage: Int): Builder = apply {
+            this.failurePercentage = failurePercentage
+        }
+
+        /** Prefix added to every resolved file path, for example `mocks/`. */
+        public fun basePath(basePath: String): Builder = apply { this.basePath = basePath }
+
+        /** Simulated latency in `[minMilliseconds, maxMilliseconds)`. Equal bounds give a fixed latency. */
+        public fun delay(minMilliseconds: Int, maxMilliseconds: Int): Builder = apply {
+            minDelayMilliseconds = minMilliseconds
+            maxDelayMilliseconds = maxMilliseconds
+        }
+
+        /** Answers immediately. Useful in tests. */
+        public fun noDelay(): Builder = delay(0, 0)
+
+        /** Creates the interceptor, validating the configuration. */
+        public fun build(): OkHttpMockInterceptor = OkHttpMockInterceptor(
+            inputStreamProvider,
+            failurePercentage,
+            basePath,
+            minDelayMilliseconds,
+            maxDelayMilliseconds,
+        )
     }
 
     private companion object {

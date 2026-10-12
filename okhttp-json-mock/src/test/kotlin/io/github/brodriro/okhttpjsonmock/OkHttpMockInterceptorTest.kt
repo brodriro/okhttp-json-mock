@@ -332,6 +332,40 @@ class OkHttpMockInterceptorTest {
         assertEquals(setOf(200), codes.toSet())
     }
 
+    @Test
+    fun `builder defaults match the 3_0 constructor defaults`() {
+        val interceptor = OkHttpMockInterceptor.Builder(FakeProvider(emptyMap())).build()
+
+        assertEquals(0, interceptor.failurePercentage)
+        assertEquals("", interceptor.basePath)
+        assertEquals(500, interceptor.minDelayMilliseconds)
+        assertEquals(1500, interceptor.maxDelayMilliseconds)
+    }
+
+    @Test
+    fun `builder options are applied`() {
+        val provider = FakeProvider(mapOf("mocks/api/v1/users/1.json" to USER))
+        val interceptor = OkHttpMockInterceptor.Builder(provider)
+            .basePath("mocks/")
+            .failurePercentage(100)
+            .noDelay()
+            .build()
+        val client = OkHttpClient.Builder().addInterceptor(interceptor).build()
+
+        val response = client.get("http://example.com/api/v1/users/1")
+
+        assertEquals(504, response.code)
+        assertEquals(listOf("mocks/api/v1/users/1.json"), provider.requestedPaths)
+        assertEquals(0, interceptor.maxDelayMilliseconds)
+    }
+
+    @Test
+    fun `builder validates on build`() {
+        val builder = OkHttpMockInterceptor.Builder(FakeProvider(emptyMap()))
+
+        assertFailsWith<IllegalArgumentException> { builder.failurePercentage(150).build() }
+    }
+
     private companion object {
         const val USER = """{"id":1,"name":"John"}"""
         const val NUMBERS = """["0123456789"]"""
