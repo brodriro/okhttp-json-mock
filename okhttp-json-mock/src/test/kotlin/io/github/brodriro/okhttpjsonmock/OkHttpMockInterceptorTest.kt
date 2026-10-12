@@ -1,6 +1,6 @@
-package ir.mirrajabi.okhttpjsonmock
+package io.github.brodriro.okhttpjsonmock
 
-import ir.mirrajabi.okhttpjsonmock.providers.InputStreamProvider
+import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request

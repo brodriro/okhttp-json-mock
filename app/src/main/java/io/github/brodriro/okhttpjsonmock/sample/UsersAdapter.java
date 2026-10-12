@@ -1,4 +1,4 @@
-package ir.mirrajabi.okhttpjsonmock.sample;
+package io.github.brodriro.okhttpjsonmock.sample;
 
 import android.content.Context;
 import androidx.annotation.NonNull;
@@ -10,7 +10,7 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 
-import ir.mirrajabi.okhttpjsonmock.sample.models.UserModel;
+import io.github.brodriro.okhttpjsonmock.sample.models.UserModel;
 
 public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.ViewHolder> {
     ArrayList<UserModel> users = new ArrayList<>();

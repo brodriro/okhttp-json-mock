@@ -1,4 +1,4 @@
-package ir.mirrajabi.okhttpjsonmock.providers;
+package io.github.brodriro.okhttpjsonmock.providers;
 
 import java.io.InputStream;
 

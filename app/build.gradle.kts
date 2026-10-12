@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "ir.mirrajabi.okhttpjsonmock.sample"
+    namespace = "io.github.brodriro.okhttpjsonmock.sample"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "ir.mirrajabi.okhttpjsonmock.sample"
+        applicationId = "io.github.brodriro.okhttpjsonmock.sample"
         minSdk = 23
         targetSdk = 36
         versionCode = 1

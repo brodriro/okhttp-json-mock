@@ -1,4 +1,4 @@
-package ir.mirrajabi.okhttpjsonmock.sample;
+package io.github.brodriro.okhttpjsonmock.sample;
 
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
@@ -13,9 +13,9 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
-import ir.mirrajabi.okhttpjsonmock.OkHttpMockInterceptor;
-import ir.mirrajabi.okhttpjsonmock.providers.InputStreamProvider;
-import ir.mirrajabi.okhttpjsonmock.sample.services.UsersService;
+import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor;
+import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider;
+import io.github.brodriro.okhttpjsonmock.sample.services.UsersService;
 import okhttp3.OkHttpClient;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;

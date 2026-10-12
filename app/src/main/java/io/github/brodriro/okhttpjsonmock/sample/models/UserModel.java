@@ -1,4 +1,4 @@
-package ir.mirrajabi.okhttpjsonmock.sample.models;
+package io.github.brodriro.okhttpjsonmock.sample.models;
 
 import com.google.gson.annotations.SerializedName;
 

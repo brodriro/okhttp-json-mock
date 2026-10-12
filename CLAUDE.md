@@ -26,7 +26,7 @@ The library has JUnit 5 tests written in Kotlin under `okhttp-json-mock/src/test
 
 ```sh
 ./gradlew :okhttp-json-mock:test                                              # all library tests
-./gradlew :okhttp-json-mock:test --tests 'ir.mirrajabi.okhttpjsonmock.OkHttpMockInterceptorTest'
+./gradlew :okhttp-json-mock:test --tests 'io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptorTest'
 ./gradlew build                                                             # compile + tests + Android lint
 ```
 

@@ -1,9 +1,9 @@
-package ir.mirrajabi.okhttpjsonmock.sample.services;
+package io.github.brodriro.okhttpjsonmock.sample.services;
 
 import java.util.ArrayList;
 
 import io.reactivex.Observable;
-import ir.mirrajabi.okhttpjsonmock.sample.models.UserModel;
+import io.github.brodriro.okhttpjsonmock.sample.models.UserModel;
 import retrofit2.http.GET;
 import retrofit2.http.Path;
 import retrofit2.http.Query;

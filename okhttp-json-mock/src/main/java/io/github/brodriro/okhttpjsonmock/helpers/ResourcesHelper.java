@@ -1,11 +1,11 @@
-package ir.mirrajabi.okhttpjsonmock.helpers;
+package io.github.brodriro.okhttpjsonmock.helpers;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-import ir.mirrajabi.okhttpjsonmock.providers.InputStreamProvider;
+import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider;
 
 public class ResourcesHelper {
     public static String loadFileAsString(InputStreamProvider inputStreamProvider, String name) {

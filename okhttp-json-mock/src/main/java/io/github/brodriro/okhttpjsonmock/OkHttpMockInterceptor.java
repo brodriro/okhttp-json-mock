@@ -1,11 +1,11 @@
-package ir.mirrajabi.okhttpjsonmock;
+package io.github.brodriro.okhttpjsonmock;
 
 import java.io.IOException;
 import java.util.Random;
 
-import ir.mirrajabi.okhttpjsonmock.helpers.ResourcesHelper;
-import ir.mirrajabi.okhttpjsonmock.providers.DefaultInputStreamProvider;
-import ir.mirrajabi.okhttpjsonmock.providers.InputStreamProvider;
+import io.github.brodriro.okhttpjsonmock.helpers.ResourcesHelper;
+import io.github.brodriro.okhttpjsonmock.providers.DefaultInputStreamProvider;
+import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.MediaType;
