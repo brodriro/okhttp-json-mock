@@ -6,10 +6,12 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import java.io.InterruptedIOException
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /**
  * Pins the behaviour inherited from 3.0 so the Kotlin migration and the
@@ -244,6 +246,22 @@ class OkHttpMockInterceptorTest {
 
         assertFailsWith<IllegalArgumentException> { OkHttpMockInterceptor(provider, -1) }
         assertFailsWith<IllegalArgumentException> { OkHttpMockInterceptor(provider, 101) }
+    }
+
+    @Test
+    fun `interruption during the delay fails the call and keeps the interrupt flag`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to USER))
+        val client = OkHttpClient.Builder()
+            .addInterceptor(OkHttpMockInterceptor(provider, 0, 5_000, 5_000))
+            .build()
+
+        Thread.currentThread().interrupt()
+        try {
+            assertFailsWith<InterruptedIOException> { client.get("http://example.com/api/v1/users/1") }
+            assertTrue(Thread.currentThread().isInterrupted)
+        } finally {
+            Thread.interrupted()
+        }
     }
 
     private companion object {

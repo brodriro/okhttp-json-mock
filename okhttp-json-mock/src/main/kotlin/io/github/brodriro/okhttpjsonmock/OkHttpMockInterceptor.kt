@@ -10,6 +10,7 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import java.io.InterruptedIOException
 import java.util.Random
 import kotlin.math.abs
 
@@ -92,7 +93,8 @@ public class OkHttpMockInterceptor(
         try {
             Thread.sleep(nextDelayMilliseconds())
         } catch (e: InterruptedException) {
-            e.printStackTrace()
+            Thread.currentThread().interrupt()
+            throw InterruptedIOException("Interrupted while simulating the network delay").apply { initCause(e) }
         }
         if (mock == null) {
             print("JsonMockServer: No mock found for ${request.url.encodedPath}\t\tStatusCode : $HTTP_NOT_FOUND")
