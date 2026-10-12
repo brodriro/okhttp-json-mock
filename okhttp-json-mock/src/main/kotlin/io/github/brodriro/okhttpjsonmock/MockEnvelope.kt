@@ -93,7 +93,9 @@ internal class MockEnvelope(
                 ?.asString
                 ?.toIntOrNull()
             return code?.takeIf { it in 100..599 }
-                ?: throw IOException("$source: statusCode must be an HTTP status code between 100 and 599 but was $value")
+                ?: throw IOException(
+                    "$source: statusCode must be an HTTP status code between 100 and 599 but was $value",
+                )
         }
     }
 }
