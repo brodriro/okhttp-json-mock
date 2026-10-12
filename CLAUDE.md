@@ -34,24 +34,31 @@ The library version is set in `okhttp-json-mock/build.gradle.kts` and must be ke
 
 ## How the interceptor resolves a request
 
-All logic is in `OkHttpMockInterceptor.intercept` (`io.github.brodriro.okhttpjsonmock`). `candidatePaths` builds the lookup, most specific first:
+`OkHttpMockInterceptor.intercept` (`io.github.brodriro.okhttpjsonmock`) asks `MockFileResolver.candidates(method, url)` for the files that can answer the request and uses the first one the provider has. For `GET /api/v1/users?page=1` the order is:
 
-1. `basePath + <encodedPath> + "/" + <encodedQuery> + ".json"` — only when there is a query string.
-   e.g. `GET /api/v1/users?page=1` → `api/v1/users/page=1.json`; multiple params keep the URL's `&` order: `page=1&categoryId=5.json`.
-2. Fallback: `basePath + <encodedPath> + ".json"`, e.g. `/api/v1/users/1` → `api/v1/users/1.json`.
+1. `api/v1/users/page=1.get.json` — this method, this query.
+2. `api/v1/users.get.json` — this method, any query.
+3. `api/v1/users/page=1.json` — any method, this query.
+4. `api/v1/users.json` — any method, any query.
 
-Leading and trailing slashes are trimmed, and the root path `/` is looked up as `index.json`.
+The method suffix is the HTTP method in lower case (`.get`, `.post`, `.put`, `.delete`, `.patch`, …). Files without it answer every method, which keeps 3.0 mocks working and is how one URL gets a different mock per method.
+
+With several query parameters the exact string is tried first (`page=1&categoryId=5`) and then the same parameters sorted (`categoryId=5&page=1`), in both the method and the shared group. `basePath` is prepended to every candidate. Leading and trailing slashes are trimmed, and the root path `/` is looked up as `index`.
+
+A mock is answered as it is with status 200. To answer with another status the file wraps the response in an envelope read by `MockEnvelope` with Gson: `{ "statusCode": 201, "response": { ... } }` answers 201 with the `response` value as the body, and `{ "statusCode": 204 }` answers with no body. An optional `"headers": { "Location": "/users/4" }` object adds response headers (values may be strings, numbers or booleans; `Content-Type` replaces the default). A file is an envelope only when it is an object that has `statusCode` and no keys other than `statusCode`, `headers` and `response`; everything else, including a real payload with a `statusCode` field plus other keys, is served untouched. An envelope whose `statusCode` is not an HTTP status, or whose `headers` is not an object of valid names and simple values, fails the call with an `IOException` naming the file.
 
 Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `getAssets().open(path)` (see `MainActivity.getAndroidProvider`). A provider signals "not found" by returning `null`.
 
 Behaviours that are easy to miss:
 
-- Host, HTTP method, headers and request body are ignored; only path and query select the file. Method-aware lookup is phase 3 of the roadmap.
+- Host, headers and request body are ignored; only method, path and query select the file.
+- Every miss costs one provider call, so a request can make up to six lookups. Providers must return `null` quietly for a missing file.
 - The real network is never hit: `chain.proceed` is not called.
 - No matching file → 404 with a `text/plain` body listing the files that were tried. This wins over the simulated failure.
 - `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
 - Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms); equal bounds give a fixed delay. An interrupt during the sleep throws `InterruptedIOException`.
-- The file is returned byte for byte as `application/json`; the status line carries the standard reason phrase.
+- A plain mock is returned byte for byte as `application/json`; an envelope's `response` is re-serialised by Gson (compact, nulls and number text preserved). The status line carries the standard reason phrase.
+- Gson is an `implementation` dependency used only by `MockEnvelope`; files that do not contain the text `statusCode` are never parsed.
 - Instances are immutable. They are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
 - Each call logs one line through `MockLogger` (`STDOUT` by default, `NONE` to silence).
 - Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`) throws `IllegalArgumentException` at construction.

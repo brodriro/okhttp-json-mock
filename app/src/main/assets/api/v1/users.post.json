@@ -1,0 +1,13 @@
+{
+  "statusCode": 201,
+  "headers": {
+    "Location": "/api/v1/users/4"
+  },
+  "response": {
+    "id": 4,
+    "name": "Ana",
+    "lastName": "Diaz",
+    "age": 31,
+    "phoneNumbers": []
+  }
+}

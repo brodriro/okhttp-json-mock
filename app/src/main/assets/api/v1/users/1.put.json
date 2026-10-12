@@ -1,0 +1,9 @@
+{
+  "id": 0,
+  "name": "John",
+  "lastName": "Smith",
+  "age": 21,
+  "phoneNumbers": [
+    "0123456789"
+  ]
+}

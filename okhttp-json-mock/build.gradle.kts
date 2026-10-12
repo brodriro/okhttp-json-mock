@@ -23,6 +23,7 @@ kotlin {
 
 dependencies {
     api(libs.okhttp)
+    implementation(libs.gson)
 
     testImplementation(kotlin("test"))
     testImplementation(platform(libs.junit.bom))
@@ -32,6 +33,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // SampleMocksTest reads the example mocks of the sample app.
+    inputs.dir(rootProject.file("app/src/main/assets")).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 mavenPublishing {

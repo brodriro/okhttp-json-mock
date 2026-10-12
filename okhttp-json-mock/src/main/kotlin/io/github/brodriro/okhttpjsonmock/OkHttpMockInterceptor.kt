@@ -2,9 +2,8 @@ package io.github.brodriro.okhttpjsonmock
 
 import io.github.brodriro.okhttpjsonmock.providers.DefaultInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
-import okhttp3.HttpUrl
 import okhttp3.Interceptor
-import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
@@ -15,8 +14,18 @@ import kotlin.random.Random
 /**
  * Answers every request with the contents of a local JSON file instead of hitting the network.
  *
- * The file is chosen from the request URL: `/api/v1/users?page=1` is looked up as
- * `api/v1/users/page=1.json` and then as `api/v1/users.json`. Host, headers and body are ignored.
+ * The file is chosen from the request method and URL. `GET /api/v1/users?page=1` is looked up as
+ * `api/v1/users/page=1.get.json`, `api/v1/users.get.json`, `api/v1/users/page=1.json` and
+ * `api/v1/users.json`, in that order. A file with a method suffix (`users.post.json`) only answers
+ * that method, so one URL can have a different mock per method; a file without it answers any
+ * method. Host, headers and body are ignored.
+ *
+ * A mock is answered as it is with status 200. To answer with another status, wrap it:
+ * `{ "statusCode": 201, "response": { "id": 4 } }` answers 201 with `{"id":4}` as the body, and
+ * `{ "statusCode": 204 }` answers 204 with no body. The wrapper can also carry response headers
+ * in an optional `"headers": { "Location": "/users/4" }` object. A file is only treated as a
+ * wrapper when it has `statusCode` and no keys other than `statusCode`, `headers` and `response`,
+ * so real payloads that happen to have a `statusCode` field are left alone.
  * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
@@ -40,6 +49,8 @@ public class OkHttpMockInterceptor private constructor(
     public val failureCode: Int,
     private val logger: MockLogger,
 ) : Interceptor {
+
+    private val resolver = MockFileResolver(basePath)
 
     init {
         require(failureCode in 400..599) { "failureCode must be a 4xx or 5xx status: $failureCode" }
@@ -96,7 +107,7 @@ public class OkHttpMockInterceptor private constructor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        val candidates = candidatePaths(request.url)
+        val candidates = resolver.candidates(request.method, request.url)
         val match = candidates.firstNotNullOfOrNull { path -> readMock(path)?.let { path to it } }
         try {
             Thread.sleep(nextDelayMilliseconds())
@@ -112,34 +123,42 @@ public class OkHttpMockInterceptor private constructor(
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
         val (path, mock) = match
+        val envelope = MockEnvelope.parseOrNull(mock, path)
         if (Random.nextInt(100) < failurePercentage) {
             logger.log("$call -> $failureCode, simulated failure")
             return response(request, failureCode, ByteArray(0), CONTENT_TYPE_JSON)
         }
-        logger.log("$call -> $HTTP_OK from $path")
-        return response(request, HTTP_OK, mock, CONTENT_TYPE_JSON)
-    }
-
-    /** Files that can answer [url], most specific first. */
-    private fun candidatePaths(url: HttpUrl): List<String> {
-        val path = url.encodedPath.trim('/').ifEmpty { ROOT_FILE_NAME }
-        val query = url.encodedQuery.orEmpty()
-        val queryFile = if (query.isEmpty()) null else "$basePath$path/$query.json"
-        return listOfNotNull(queryFile, "$basePath$path.json")
+        val statusCode = envelope?.statusCode ?: HTTP_OK
+        logger.log("$call -> $statusCode from $path")
+        return response(
+            request,
+            statusCode,
+            envelope?.body ?: mock,
+            envelope?.contentType ?: CONTENT_TYPE_JSON,
+            envelope?.headers.orEmpty(),
+        )
     }
 
     /** The raw bytes of the mock at [path], or `null` when the provider has no such file. */
     private fun readMock(path: String): ByteArray? = inputStreamProvider.provide(path)?.use { it.readBytes() }
 
-    private fun response(request: Request, code: Int, body: ByteArray, contentType: String): Response =
-        Response.Builder()
+    private fun response(
+        request: Request,
+        code: Int,
+        body: ByteArray,
+        contentType: String,
+        headers: List<Pair<String, String>> = emptyList(),
+    ): Response {
+        val builder = Response.Builder()
             .code(code)
             .message(reasonPhrase(code))
             .request(request)
             .protocol(Protocol.HTTP_1_1)
-            .body(body.toResponseBody(contentType.toMediaType()))
+            .body(body.toResponseBody(contentType.toMediaTypeOrNull()))
             .addHeader("content-type", contentType)
-            .build()
+        headers.forEach { (name, value) -> builder.addHeader(name, value) }
+        return builder.build()
+    }
 
     private fun reasonPhrase(code: Int): String = when (code) {
         200 -> "OK"
@@ -225,7 +244,6 @@ public class OkHttpMockInterceptor private constructor(
         const val DEFAULT_BASE_PATH = ""
         const val DELAY_DEFAULT_MIN = 500
         const val DELAY_DEFAULT_MAX = 1500
-        const val ROOT_FILE_NAME = "index"
         const val HTTP_OK = 200
         const val HTTP_NOT_FOUND = 404
         const val DEFAULT_FAILURE_CODE = 504

@@ -1,6 +1,7 @@
 package io.github.brodriro.okhttpjsonmock
 
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
+import com.google.gson.JsonParser
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -8,6 +9,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InterruptedIOException
 import java.io.PrintStream
 import java.util.concurrent.Callable
@@ -17,6 +19,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -55,7 +58,7 @@ class OkHttpMockInterceptorTest {
 
         assertEquals(200, response.code)
         assertEquals(USER, response.body!!.string())
-        assertEquals(listOf("api/v1/users/1.json"), provider.requestedPaths)
+        assertEquals(listOf("api/v1/users/1.get.json", "api/v1/users/1.json"), provider.requestedPaths)
     }
 
     @Test
@@ -74,7 +77,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users?page=1")
 
         assertEquals(USERS, response.body!!.string())
-        assertEquals(listOf("api/v1/users/page=1.json"), provider.requestedPaths)
+        assertEquals("api/v1/users/page=1.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -107,7 +110,15 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users?page=7")
 
         assertEquals(USERS, response.body!!.string())
-        assertEquals(listOf("api/v1/users/page=7.json", "api/v1/users.json"), provider.requestedPaths)
+        assertEquals(
+            listOf(
+                "api/v1/users/page=7.get.json",
+                "api/v1/users.get.json",
+                "api/v1/users/page=7.json",
+                "api/v1/users.json",
+            ),
+            provider.requestedPaths,
+        )
     }
 
     @Test
@@ -212,7 +223,8 @@ class OkHttpMockInterceptorTest {
         assertContains(body, "GET /api/v1/users")
         assertContains(body, "api/v1/users/page=1.json")
         assertContains(body, "api/v1/users.json")
-        assertEquals(listOf("api/v1/users/page=1.json", "api/v1/users.json"), provider.requestedPaths)
+        assertContains(body, "api/v1/users.get.json")
+        assertEquals(4, provider.requestedPaths.size)
     }
 
     @Test
@@ -305,7 +317,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/")
 
         assertEquals(USER, response.body!!.string())
-        assertEquals(listOf("index.json"), provider.requestedPaths)
+        assertEquals("index.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -315,7 +327,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users/")
 
         assertEquals(USERS, response.body!!.string())
-        assertEquals(listOf("api/v1/users.json"), provider.requestedPaths)
+        assertEquals("api/v1/users.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -357,7 +369,7 @@ class OkHttpMockInterceptorTest {
         val response = client.get("http://example.com/api/v1/users/1")
 
         assertEquals(504, response.code)
-        assertEquals(listOf("mocks/api/v1/users/1.json"), provider.requestedPaths)
+        assertEquals("mocks/api/v1/users/1.json", provider.requestedPaths.last())
         assertEquals(0, interceptor.maxDelayMilliseconds)
     }
 
@@ -405,7 +417,7 @@ class OkHttpMockInterceptorTest {
         assertEquals(
             listOf(
                 "GET /api/v1/users?page=1 -> 200 from api/v1/users/page=1.json",
-                "GET /api/v1/unknown -> 404, no mock found. Tried: api/v1/unknown.json",
+                "GET /api/v1/unknown -> 404, no mock found. Tried: api/v1/unknown.get.json, api/v1/unknown.json",
             ),
             lines,
         )
@@ -438,6 +450,284 @@ class OkHttpMockInterceptorTest {
             System.setOut(original)
         }
         return captured.toString()
+    }
+
+    @Test
+    fun `same url answers each http method with its own mock`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users.get.json" to """["list"]""",
+                "api/v1/users.post.json" to """{"created":true}""",
+                "api/v1/users.put.json" to """{"replaced":true}""",
+                "api/v1/users.delete.json" to """{"deleted":true}""",
+            ),
+        )
+        val client = clientFor(provider)
+        val url = "http://example.com/api/v1/users"
+
+        assertEquals("""["list"]""", client.call("GET", url))
+        assertEquals("""{"created":true}""", client.call("POST", url))
+        assertEquals("""{"replaced":true}""", client.call("PUT", url))
+        assertEquals("""{"deleted":true}""", client.call("DELETE", url))
+    }
+
+    @Test
+    fun `method mock wins over the mock shared by every method`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users.json" to """["shared"]""",
+                "api/v1/users.post.json" to """{"created":true}""",
+            ),
+        )
+        val client = clientFor(provider)
+        val url = "http://example.com/api/v1/users"
+
+        assertEquals("""{"created":true}""", client.call("POST", url))
+        assertEquals("""["shared"]""", client.call("GET", url))
+        assertEquals("""["shared"]""", client.call("DELETE", url))
+    }
+
+    @Test
+    fun `method mock can be specific to a query string`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users/page=1.get.json" to """["page 1"]""",
+                "api/v1/users.get.json" to """["any page"]""",
+            ),
+        )
+        val client = clientFor(provider)
+
+        assertEquals("""["page 1"]""", client.call("GET", "http://example.com/api/v1/users?page=1"))
+        assertEquals("""["any page"]""", client.call("GET", "http://example.com/api/v1/users?page=2"))
+    }
+
+    @Test
+    fun `a mock for another method does not answer the request`() {
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"created":true}"""))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/users")
+
+        assertEquals(404, response.code)
+    }
+
+    private fun OkHttpClient.call(method: String, url: String): String {
+        val body = if (method == "GET") null else "{}".toRequestBody("application/json".toMediaType())
+        return newCall(Request.Builder().url(url).method(method, body).build()).execute().body!!.string()
+    }
+
+    @Test
+    fun `a mock named with sorted parameters answers any parameter order`() {
+        val provider = FakeProvider(mapOf("api/v1/posts/categoryId=5&page=1.json" to USERS))
+        val client = clientFor(provider)
+
+        assertEquals(USERS, client.get("http://example.com/api/v1/posts?page=1&categoryId=5").body!!.string())
+        assertEquals(USERS, client.get("http://example.com/api/v1/posts?categoryId=5&page=1").body!!.string())
+    }
+
+    @Test
+    fun `a mock named with the exact parameter order wins over the sorted one`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/posts/page=1&categoryId=5.json" to USER,
+                "api/v1/posts/categoryId=5&page=1.json" to USERS,
+            ),
+        )
+
+        val response = clientFor(provider).get("http://example.com/api/v1/posts?page=1&categoryId=5")
+
+        assertEquals(USER, response.body!!.string())
+    }
+
+    @Test
+    fun `mock with a statusCode envelope answers with that status and the wrapped response`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/users.post.json" to """{ "statusCode": 201, "response": { "id": 4, "name": "Ana" } }"""),
+        )
+
+        val response = clientFor(provider).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(201, response.code)
+        assertEquals("Created", response.message)
+        assertEquals("""{"id":4,"name":"Ana"}""", response.body!!.string())
+    }
+
+    @Test
+    fun `envelope without response answers with an empty body`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.delete.json" to """{ "statusCode": 204 }"""))
+
+        val response = clientFor(provider).send("DELETE", "http://example.com/api/v1/users/1")
+
+        assertEquals(204, response.code)
+        assertEquals("", response.body!!.string())
+    }
+
+    @Test
+    fun `envelope can describe an error response`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/login.post.json" to """{"statusCode":401,"response":{"error":"bad credentials"}}"""),
+        )
+
+        val response = clientFor(provider).send("POST", "http://example.com/api/v1/login")
+
+        assertEquals(401, response.code)
+        assertEquals("""{"error":"bad credentials"}""", response.body!!.string())
+    }
+
+    @Test
+    fun `real payload that has a statusCode field is served as it is`() {
+        val payload = """{ "statusCode": 404, "message": "Not found" }"""
+        val provider = FakeProvider(mapOf("api/v1/errors/last.json" to payload))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/errors/last")
+
+        assertEquals(200, response.code)
+        assertEquals(payload, response.body!!.string())
+    }
+
+    @Test
+    fun `envelope with an invalid status code fails the call naming the file`() {
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"statusCode":"created"}"""))
+
+        val error = assertFailsWith<IOException> {
+            clientFor(provider).send("POST", "http://example.com/api/v1/users")
+        }
+
+        assertContains(error.message!!, "api/v1/users.post.json")
+    }
+
+    @Test
+    fun `simulated failure wins over the status code of the envelope`() {
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"statusCode":201,"response":{"id":4}}"""))
+
+        val response = clientFor(provider, failurePercentage = 100).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(504, response.code)
+        assertEquals("", response.body!!.string())
+    }
+
+    @Test
+    fun `log line reports the status code of the envelope`() {
+        val lines = mutableListOf<String>()
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"statusCode":201,"response":{"id":4}}"""))
+        val interceptor = OkHttpMockInterceptor.Builder(provider).noDelay().logger { lines += it }.build()
+
+        OkHttpClient.Builder().addInterceptor(interceptor).build().send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(listOf("POST /api/v1/users -> 201 from api/v1/users.post.json"), lines)
+    }
+
+    private fun OkHttpClient.send(method: String, url: String): Response {
+        val body = if (method == "GET") null else "{}".toRequestBody("application/json".toMediaType())
+        return newCall(Request.Builder().url(url).method(method, body).build()).execute()
+    }
+
+    @Test
+    fun `envelope headers are sent with the response`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users.post.json" to
+                    """{"statusCode":201,"headers":{"Location":"/api/v1/users/4","X-Total-Count":4},"response":{"id":4}}""",
+            ),
+        )
+
+        val response = clientFor(provider).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(201, response.code)
+        assertEquals("/api/v1/users/4", response.header("Location"))
+        assertEquals("4", response.header("X-Total-Count"))
+        assertEquals("application/json", response.header("content-type"))
+        assertEquals("""{"id":4}""", response.body!!.string())
+    }
+
+    @Test
+    fun `envelope without headers only sends the content type`() {
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"statusCode":201,"response":{"id":4}}"""))
+
+        val response = clientFor(provider).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(listOf("content-type"), response.headers.names().toList())
+    }
+
+    @Test
+    fun `envelope content type header replaces the default`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/health.json" to """{"statusCode":200,"headers":{"Content-Type":"text/plain"},"response":"ok"}"""),
+        )
+
+        val response = clientFor(provider).get("http://example.com/api/v1/health")
+
+        assertEquals(listOf("text/plain"), response.headers("content-type"))
+        assertEquals("text", response.body!!.contentType()!!.type)
+    }
+
+    @Test
+    fun `simulated failure does not send the envelope headers`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/users.post.json" to """{"statusCode":201,"headers":{"Location":"/api/v1/users/4"}}"""),
+        )
+
+        val response = clientFor(provider, failurePercentage = 100).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(504, response.code)
+        assertNull(response.header("Location"))
+    }
+
+    @Test
+    fun `plain mock can be a json object or a json array`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users/1.json" to """{ "id": 1, "tags": ["a", "b"], "address": { "city": "Lima" } }""",
+                "api/v1/users.json" to """[ { "id": 1 }, { "id": 2 } ]""",
+                "api/v1/tags.json" to "[]",
+                "api/v1/settings.json" to "{}",
+            ),
+        )
+        val client = clientFor(provider)
+
+        val user = JsonParser.parseString(client.get("http://example.com/api/v1/users/1").body!!.string())
+        val users = JsonParser.parseString(client.get("http://example.com/api/v1/users").body!!.string())
+
+        assertTrue(user.isJsonObject)
+        assertEquals("Lima", user.asJsonObject.getAsJsonObject("address").get("city").asString)
+        assertTrue(users.isJsonArray)
+        assertEquals(2, users.asJsonArray.size())
+        assertEquals("[]", client.get("http://example.com/api/v1/tags").body!!.string())
+        assertEquals("{}", client.get("http://example.com/api/v1/settings").body!!.string())
+    }
+
+    @Test
+    fun `envelope response can be a json object or a json array`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users.post.json" to
+                    """{ "statusCode": 201, "response": { "id": 4, "tags": ["a"], "address": { "city": "Lima" } } }""",
+                "api/v1/users.get.json" to """{ "statusCode": 200, "response": [ { "id": 1 }, { "id": 2 } ] }""",
+                "api/v1/tags.get.json" to """{ "statusCode": 200, "response": [] }""",
+                "api/v1/settings.get.json" to """{ "statusCode": 200, "response": {} }""",
+            ),
+        )
+        val client = clientFor(provider)
+
+        val created = JsonParser.parseString(client.send("POST", "http://example.com/api/v1/users").body!!.string())
+        val users = JsonParser.parseString(client.get("http://example.com/api/v1/users").body!!.string())
+
+        assertTrue(created.isJsonObject)
+        assertEquals("Lima", created.asJsonObject.getAsJsonObject("address").get("city").asString)
+        assertTrue(users.isJsonArray)
+        assertEquals(listOf(1, 2), users.asJsonArray.map { it.asJsonObject.get("id").asInt })
+        assertEquals("[]", client.get("http://example.com/api/v1/tags").body!!.string())
+        assertEquals("{}", client.get("http://example.com/api/v1/settings").body!!.string())
+    }
+
+    @Test
+    fun `plain array whose items have a statusCode field is served as it is`() {
+        val payload = """[ { "statusCode": 201 }, { "statusCode": 404 } ]"""
+        val provider = FakeProvider(mapOf("api/v1/events.json" to payload))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/events")
+
+        assertEquals(200, response.code)
+        assertEquals(payload, response.body!!.string())
     }
 
     private companion object {

@@ -1,133 +1,243 @@
 # okhttp-json-mock
-[![](https://jitpack.io/v/mirrajabi/okhttp-json-mock.svg?style=flat-square)](https://jitpack.io/#mirrajabi/okhttp-json-mock)
-[![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Okhttp%20Json%20Mock-brightgreen.svg?style=flat)](https://android-arsenal.com/details/1/5239)
 
-This simple library helps you mock your data for using with okhttp+retrofit in json format in just a few moves.
-it forwards the requests to local json files and returns the data stored in them.
+Mock your OkHttp and Retrofit calls with local JSON files. An interceptor answers every request with the
+contents of a file whose path mirrors the request URL, so the real network is never used.
 
-## Version 3.0 Notes:
-`3.0` introduces breaking changes, since it removes the wrapper for mocked responses ([MockedResponse.java](https://github.com/mirrajabi/okhttp-json-mock/blob/2.0/okhttpjsonmock/src/main/java/ir/mirrajabi/okhttpjsonmock/models/MockedResponse.java)) and therefor does not alter the api anymore.
-Data transfer objects are now accessed directly without embedding them into an additional json object. See the [Version 2.0 Documentation](https://github.com/mirrajabi/okhttp-json-mock/blob/2.0/README.md) for the old api.
+> **This is a fork.** It continues [mirrajabi/okhttp-json-mock](https://github.com/mirrajabi/okhttp-json-mock)
+> from version 3.0, which has not been updated since 2018. Version 4.0 keeps the same idea and class names,
+> migrates the library to Kotlin and adds mocks per HTTP method and per status code.
+> Credit for the original library goes to [Mohammad Mirrajabi](https://github.com/mirrajabi) and its contributors.
 
-## Version 2.0 Notes:
-Since version `2.0` the dependency to android platform is removed so it will be useful for all your jvm-based projects, not just android. You can still use version `1.1.1` if you don't care.
+## What is new in 4.0
 
-### Usage
-First add jitpack to your projects build.gradle file
-```gradle
-allprojects {
-   	repositories {
-   		...
-   		maven { url "https://jitpack.io" }
-   	}
+- **One URL, several HTTP methods.** `users.get.json` and `users.post.json` answer `GET /users` and `POST /users`.
+- **Status code and headers per mock**, written inside the mock file itself.
+- **404 instead of a crash** when no mock matches, with the list of files that were tried.
+- Written in Kotlin, still usable from Java. Works on any JVM project, not only Android.
+
+## Installation
+
+> 4.0.0 is not released yet. It will be published to Maven Central with the coordinates below.
+> Until then, the latest released version is 3.0 from the original repository.
+
+```kotlin
+dependencies {
+    implementation("io.github.brodriro:okhttp-json-mock:4.0.0")
 }
 ```
-Then add the dependency in modules build.gradle file
-```gradle
-dependencies {
-    compile 'com.github.mirrajabi:okhttp-json-mock:3.0'
- }
+
+## Quick start
+
+Tell the interceptor where your mock files are, then add it to your client.
+
+On Android, mocks usually live in the `assets` folder:
+
+```kotlin
+val assets = InputStreamProvider { path ->
+    try {
+        context.assets.open(path)
+    } catch (e: IOException) {
+        null // no mock at this path
+    }
+}
+
+val client = OkHttpClient.Builder()
+    .addInterceptor(OkHttpMockInterceptor.Builder(assets).build())
+    .build()
+
+val retrofit = Retrofit.Builder()
+    .baseUrl("http://example.com")
+    .client(client)
+    .addConverterFactory(GsonConverterFactory.create())
+    .build()
 ```
-**Since version 2.0**:
-1. Construct your custom [InputStreamProvider](https://github.com/mirrajabi/okhttp-json-mock/blob/master/okhttpjsonmock/src/main/java/ir/mirrajabi/okhttpjsonmock/providers/InputStreamProvider.java):
+
+The same in Java:
 
 ```java
-InputStreamProvider inputStreamProvider = new InputStreamProvider() {
-    @Override
-    public InputStream provide(String path) {
-        try {
-            return getAssets().open(path);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
+InputStreamProvider assets = path -> {
+    try {
+        return getAssets().open(path);
+    } catch (IOException e) {
+        return null; // no mock at this path
     }
 };
-```
 
-2. Use the `InputStreamProvider` to construct the `OkHttpMockInterceptor` and client:
-```java
 OkHttpClient client = new OkHttpClient.Builder()
-    .addInterceptor(new OkHttpMockInterceptor(getAndroidProvider(), 5))
+    .addInterceptor(new OkHttpMockInterceptor.Builder(assets).build())
     .build();
 ```
 
-**For version 1.+**
-#### 1. Add OkhttpMockInterceptor to your OkhttpClient instance and attach it to your retrofit instance
-```java
-OkHttpClient mOkHttpClient = new OkHttpClient.Builder()
-    .addInterceptor(new OkHttpMockInterceptor(this, 5))
-    .build();
-    
-mRetrofit = new Retrofit.Builder()
-    .addConverterFactory(GsonConverterFactory.create())
-    .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
-    .baseUrl("http://example.com")
-    .client(mOkHttpClient)
-    .build();
+On a plain JVM project, `OkHttpMockInterceptor.Builder()` without arguments reads the files from the
+filesystem, relative to the working directory.
+
+The provider must return `null` when the file does not exist. The interceptor asks for several files per
+request and most of them will not be there.
+
+## Where to put the mock files
+
+The file path is the URL path plus `.json`. The host is ignored.
+
+| Request | Mock file |
+| --- | --- |
+| `GET /api/v1/users/1` | `api/v1/users/1.json` |
+| `GET /api/v1/users/1/phoneNumbers` | `api/v1/users/1/phoneNumbers.json` |
+| `GET /api/v1/users?page=1` | `api/v1/users/page=1.json` |
+| `GET /api/v1/posts/3?page=1&categoryId=5` | `api/v1/posts/3/page=1&categoryId=5.json` |
+| `GET /` | `index.json` |
+
+A query string becomes a file **inside** a folder named after the path. When there is no file for the
+query, the file for the path (`api/v1/users.json`) is used instead.
+
+With several parameters, the file can be named in the order the request uses or with the parameters
+sorted alphabetically (`categoryId=5&page=1.json`). The sorted name answers the request whatever order
+the client builds the query in.
+
+## One URL, different HTTP methods
+
+Put the HTTP method, in lower case, before the extension:
+
+```
+api/v1/users.get.json       GET    /api/v1/users
+api/v1/users.post.json      POST   /api/v1/users
+api/v1/users/1.put.json     PUT    /api/v1/users/1
+api/v1/users/1.delete.json  DELETE /api/v1/users/1
 ```
 
-#### 2. Prepare your api service interfaces for retrofit []()
-```java
-//usage example /users/page=phoneNumbers.json
-@GET(API_VERSION + "/users")
-Observable<ArrayList<UserModel>> getUsers(@Query("page") int page);
+A file **without** a method answers every method, so mocks written for 3.0 keep working.
 
-//usage example /users/page=1&secondParameter=phoneNumbers.json
-@GET(API_VERSION + "/users")
-Observable<ArrayList<UserModel>> getUsers(@Query("page") int page,
-                                          @Query("name") String name);
+For `GET /api/v1/users?page=1` the interceptor uses the first of these files that exists:
 
-//usage example /users/1.json
-@GET(API_VERSION + "/users/{userId}")
-Observable<UserModel> getUser(@Path("userId") int userId);
+1. `api/v1/users/page=1.get.json`
+2. `api/v1/users.get.json`
+3. `api/v1/users/page=1.json`
+4. `api/v1/users.json`
 
-//usage example /users/1/phoneNumbers.json
-@GET(API_VERSION + "/users/{userId}/phoneNumbers")
-Observable<ArrayList<String>> getUserNumbers(@Path("userId") int userId);
+## The response: objects, arrays, status codes and headers
+
+By default the file **is** the response body, returned as it is with status `200`. It can be a JSON
+object or a JSON array:
+
+```json
+{ "id": 1, "name": "John" }
 ```
 
-#### 3. Put your json models in assets folder like the [examples](https://github.com/mirrajabi/okhttp-json-mock/tree/master/app/src/main/assets)
-```
-\---api
-    \---v1
-        \---users
-            |   1.json
-            |   2.json
-            |   3.json
-            |   page=1.json
-            |
-            +---1
-            |       phoneNumbers.json
-            |
-            +---2
-            |       phoneNumbers.json
-            |
-            \---3
-                    phoneNumbers.json
+```json
+[
+  { "id": 1, "name": "John" },
+  { "id": 2, "name": "Jane" }
+]
 ```
 
-### Retrofit's annotations
-Currently [@Query](https://square.github.io/retrofit/2.x/retrofit/retrofit2/http/Query.html) and [@Path](https://square.github.io/retrofit/2.x/retrofit/retrofit2/http/Path.html) can be achieved simply with correct folder and file namings (like website routes)
-for example if you have a request like
-```java
-@GET("api/v1/posts/{userId}")
-Observable<ArrayList<Post>> getUserPosts(@Path("userId"),
-                                         @Query("page") int page,
-                                         @Query("categoryId") int categoryId);
+To answer with another status code, wrap the response:
+
+```json
+{
+  "statusCode": 201,
+  "response": { "id": 4, "name": "Ana" }
+}
 ```
-you can have json models in `api/v1/posts/{userId}` where `{userId}` could be an integer like `api/v1/posts/3`
-and in that folder the json files should have names like `page=1&categoryId=5.json`
-so multiple queries are achievable by seperating them using **Ampersand(&)** character 
 
-You can take a look at [Sample app](https://github.com/mirrajabi/okhttp-json-mock/tree/master/app) for a working example
+The app receives a `201` whose body is only what is inside `response`. `response` can be an object or
+an array, and can be left out for a response with no body:
 
-### Contributions
+```json
+{ "statusCode": 204 }
+```
 
-Any contributions are welcome. 
-just fork it and submit your changes to your fork and then create a pull request
+`headers` is optional and adds response headers:
 
-### Changelog
+```json
+{
+  "statusCode": 201,
+  "headers": {
+    "Location": "/api/v1/users/4",
+    "X-Total-Count": 4
+  },
+  "response": { "id": 4, "name": "Ana" }
+}
+```
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `statusCode` | yes | HTTP status code, from 100 to 599. |
+| `response` | no | The body: an object, an array or any JSON value. No body when missing. |
+| `headers` | no | Response headers. Values can be strings, numbers or booleans. `Content-Type` replaces the default `application/json`. |
+
+A file is only read as a wrapper when it has `statusCode` and no keys other than these three. A real
+payload such as `{ "statusCode": 404, "message": "Not found" }` has another key, so it is returned as
+it is.
+
+## Options
+
+```kotlin
+val interceptor = OkHttpMockInterceptor.Builder(provider)
+    .basePath("mocks/")           // prefix for every file path
+    .delay(200, 800)              // simulated latency in milliseconds; default 500 to 1500
+    .failurePercentage(10)        // chance, 0 to 100, of a simulated failure; default 0
+    .failureCode(503)             // status of a simulated failure; default 504
+    .logger(MockLogger.NONE)      // default MockLogger.STDOUT prints one line per call
+    .build()
+```
+
+`noDelay()` removes the latency, which is useful in tests.
+
+A simulated failure answers with the failure code and an empty body, whatever the mock says.
+
+Each call logs one line:
+
+```
+JsonMockServer: POST /api/v1/users -> 201 from api/v1/users.post.json
+```
+
+## When no mock matches
+
+The interceptor answers `404` with a plain-text body that lists the files it looked for:
+
+```
+No mock file found for GET /api/v1/unknown. Tried: api/v1/unknown.get.json, api/v1/unknown.json
+```
+
+## Example
+
+The [sample app](app) reads its mocks from [`app/src/main/assets`](app/src/main/assets):
+
+```
+api/v1/
+├── users.post.json            POST /api/v1/users         201 + Location header
+└── users/
+    ├── page=1.json            GET  /api/v1/users?page=1  plain array
+    ├── page=2.get.json        GET  /api/v1/users?page=2  wrapped empty array + header
+    ├── 1.json                 GET    /api/v1/users/1     plain object
+    ├── 1.put.json             PUT    /api/v1/users/1     plain object
+    ├── 1.delete.json          DELETE /api/v1/users/1     204, no body
+    ├── 9.get.json             GET    /api/v1/users/9     404 with an error body
+    ├── 2.json
+    ├── 3.json
+    └── 1/
+        └── phoneNumbers.json  GET /api/v1/users/1/phoneNumbers
+```
+
+## Migrating from 3.0
+
+1. Change the dependency to `io.github.brodriro:okhttp-json-mock:4.0.0`.
+2. Change the imports from `ir.mirrajabi.okhttpjsonmock` to `io.github.brodriro.okhttpjsonmock`.
+3. If you called the setters (`setBasePath`, `setFailurePercentage`, ...), use `OkHttpMockInterceptor.Builder`
+   instead. Instances are now immutable.
+
+The constructors of 3.0, such as `new OkHttpMockInterceptor(provider, 5)`, and your existing mock files
+keep working.
+
+Behaviour that changed:
+
+- A request without a mock answers `404` instead of throwing `IllegalStateException`.
+- A simulated failure has an empty body instead of the contents of the mock.
+- `ResourcesHelper` was removed.
+- OkHttp 4.12 is required.
+
+## Changelog
+
+4.0.0 (unreleased) - `Kotlin, mocks per HTTP method, status code and headers per mock, 404 for missing mocks, Builder`
 
 3.0 - `Removed wrapper for mocked responses`
 
@@ -136,3 +246,11 @@ just fork it and submit your changes to your fork and then create a pull request
 1.1.1 - `Fixes file name lowercase issue`
 
 1.1 - `Adds delay customization option.`
+
+## Contributing
+
+Contributions are welcome. Branch from `develop` and open a pull request against `develop`.
+
+## License
+
+[Apache License 2.0](LICENSE).
