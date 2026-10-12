@@ -38,6 +38,7 @@ public class OkHttpMockInterceptor private constructor(
     public val minDelayMilliseconds: Int,
     public val maxDelayMilliseconds: Int,
     public val failureCode: Int,
+    private val logger: MockLogger,
 ) : Interceptor {
 
     init {
@@ -64,6 +65,7 @@ public class OkHttpMockInterceptor private constructor(
         minDelayMilliseconds,
         maxDelayMilliseconds,
         DEFAULT_FAILURE_CODE,
+        MockLogger.STDOUT,
     )
 
     /** Reads mocks from the filesystem with the default latency. */
@@ -95,24 +97,26 @@ public class OkHttpMockInterceptor private constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val candidates = candidatePaths(request.url)
-        val mock = candidates.firstNotNullOfOrNull(::readMock)
+        val match = candidates.firstNotNullOfOrNull { path -> readMock(path)?.let { path to it } }
         try {
             Thread.sleep(nextDelayMilliseconds())
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
             throw InterruptedIOException("Interrupted while simulating the network delay").apply { initCause(e) }
         }
-        if (mock == null) {
-            print("JsonMockServer: No mock found for ${request.url.encodedPath}\t\tStatusCode : $HTTP_NOT_FOUND")
-            val explanation = "No mock file found for ${request.method} ${request.url.encodedPath}. " +
-                "Tried: ${candidates.joinToString()}"
+        val call = "${request.method} ${request.url.encodedPath}" + request.url.encodedQuery?.let { "?$it" }.orEmpty()
+        if (match == null) {
+            val tried = candidates.joinToString()
+            logger.log("$call -> $HTTP_NOT_FOUND, no mock found. Tried: $tried")
+            val explanation = "No mock file found for $call. Tried: $tried"
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
+        val (path, mock) = match
         if (Random.nextInt(100) < failurePercentage) {
-            print("JsonMockServer: Simulated failure for ${candidates.first()}\t\tStatusCode : $failureCode")
+            logger.log("$call -> $failureCode, simulated failure")
             return response(request, failureCode, ByteArray(0), CONTENT_TYPE_JSON)
         }
-        print("JsonMockServer: Returning result from ${candidates.first()}\t\tStatusCode : $HTTP_OK")
+        logger.log("$call -> $HTTP_OK from $path")
         return response(request, HTTP_OK, mock, CONTENT_TYPE_JSON)
     }
 
@@ -166,8 +170,8 @@ public class OkHttpMockInterceptor private constructor(
     /**
      * Configures an [OkHttpMockInterceptor].
      *
-     * Defaults: mocks are never failed on purpose, there is no base path and the latency is
-     * between 500 and 1500 ms.
+     * Defaults: mocks are never failed on purpose, there is no base path, the latency is
+     * between 500 and 1500 ms and each call is logged to standard output.
      *
      * @param inputStreamProvider where mock files are read from.
      */
@@ -177,6 +181,7 @@ public class OkHttpMockInterceptor private constructor(
         private var minDelayMilliseconds = DELAY_DEFAULT_MIN
         private var maxDelayMilliseconds = DELAY_DEFAULT_MAX
         private var failureCode = DEFAULT_FAILURE_CODE
+        private var logger = MockLogger.STDOUT
 
         /** Reads mocks from the filesystem. */
         public constructor() : this(DefaultInputStreamProvider())
@@ -188,6 +193,9 @@ public class OkHttpMockInterceptor private constructor(
 
         /** HTTP status of a simulated failure. Must be a 4xx or 5xx code; 504 by default. */
         public fun failureCode(failureCode: Int): Builder = apply { this.failureCode = failureCode }
+
+        /** Where the one-line summary of each call goes. Standard output by default. */
+        public fun logger(logger: MockLogger): Builder = apply { this.logger = logger }
 
         /** Prefix added to every resolved file path, for example `mocks/`. */
         public fun basePath(basePath: String): Builder = apply { this.basePath = basePath }
@@ -209,6 +217,7 @@ public class OkHttpMockInterceptor private constructor(
             minDelayMilliseconds,
             maxDelayMilliseconds,
             failureCode,
+            logger,
         )
     }
 

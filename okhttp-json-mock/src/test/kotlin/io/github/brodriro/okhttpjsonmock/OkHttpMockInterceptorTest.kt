@@ -7,7 +7,9 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import java.io.ByteArrayOutputStream
 import java.io.InterruptedIOException
+import java.io.PrintStream
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import kotlin.test.Test
@@ -388,6 +390,54 @@ class OkHttpMockInterceptorTest {
 
         assertEquals(504, builder.build().failureCode)
         assertFailsWith<IllegalArgumentException> { builder.failureCode(200).build() }
+    }
+
+    @Test
+    fun `each call is logged as one line with method, status and file`() {
+        val lines = mutableListOf<String>()
+        val provider = FakeProvider(mapOf("api/v1/users/page=1.json" to USERS))
+        val interceptor = OkHttpMockInterceptor.Builder(provider).noDelay().logger { lines += it }.build()
+        val client = OkHttpClient.Builder().addInterceptor(interceptor).build()
+
+        client.get("http://example.com/api/v1/users?page=1")
+        client.get("http://example.com/api/v1/unknown")
+
+        assertEquals(
+            listOf(
+                "GET /api/v1/users?page=1 -> 200 from api/v1/users/page=1.json",
+                "GET /api/v1/unknown -> 404, no mock found. Tried: api/v1/unknown.json",
+            ),
+            lines,
+        )
+    }
+
+    @Test
+    fun `default logger ends every line and the silent logger prints nothing`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to USER))
+        val silent = OkHttpMockInterceptor.Builder(provider).noDelay().logger(MockLogger.NONE).build()
+
+        val printedByDefault = captureStandardOutput { clientFor(provider).get("http://example.com/api/v1/users/1") }
+        val printedBySilent = captureStandardOutput {
+            OkHttpClient.Builder().addInterceptor(silent).build().get("http://example.com/api/v1/users/1")
+        }
+
+        assertEquals(
+            "JsonMockServer: GET /api/v1/users/1 -> 200 from api/v1/users/1.json" + System.lineSeparator(),
+            printedByDefault,
+        )
+        assertEquals("", printedBySilent)
+    }
+
+    private fun captureStandardOutput(block: () -> Unit): String {
+        val original = System.out
+        val captured = ByteArrayOutputStream()
+        System.setOut(PrintStream(captured))
+        try {
+            block()
+        } finally {
+            System.setOut(original)
+        }
+        return captured.toString()
     }
 
     private companion object {
