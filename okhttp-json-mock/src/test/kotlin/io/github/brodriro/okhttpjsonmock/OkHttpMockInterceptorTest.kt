@@ -1,6 +1,7 @@
 package io.github.brodriro.okhttpjsonmock
 
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
+import com.google.gson.JsonParser
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -669,6 +670,64 @@ class OkHttpMockInterceptorTest {
 
         assertEquals(504, response.code)
         assertNull(response.header("Location"))
+    }
+
+    @Test
+    fun `plain mock can be a json object or a json array`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users/1.json" to """{ "id": 1, "tags": ["a", "b"], "address": { "city": "Lima" } }""",
+                "api/v1/users.json" to """[ { "id": 1 }, { "id": 2 } ]""",
+                "api/v1/tags.json" to "[]",
+                "api/v1/settings.json" to "{}",
+            ),
+        )
+        val client = clientFor(provider)
+
+        val user = JsonParser.parseString(client.get("http://example.com/api/v1/users/1").body!!.string())
+        val users = JsonParser.parseString(client.get("http://example.com/api/v1/users").body!!.string())
+
+        assertTrue(user.isJsonObject)
+        assertEquals("Lima", user.asJsonObject.getAsJsonObject("address").get("city").asString)
+        assertTrue(users.isJsonArray)
+        assertEquals(2, users.asJsonArray.size())
+        assertEquals("[]", client.get("http://example.com/api/v1/tags").body!!.string())
+        assertEquals("{}", client.get("http://example.com/api/v1/settings").body!!.string())
+    }
+
+    @Test
+    fun `envelope response can be a json object or a json array`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users.post.json" to
+                    """{ "statusCode": 201, "response": { "id": 4, "tags": ["a"], "address": { "city": "Lima" } } }""",
+                "api/v1/users.get.json" to """{ "statusCode": 200, "response": [ { "id": 1 }, { "id": 2 } ] }""",
+                "api/v1/tags.get.json" to """{ "statusCode": 200, "response": [] }""",
+                "api/v1/settings.get.json" to """{ "statusCode": 200, "response": {} }""",
+            ),
+        )
+        val client = clientFor(provider)
+
+        val created = JsonParser.parseString(client.send("POST", "http://example.com/api/v1/users").body!!.string())
+        val users = JsonParser.parseString(client.get("http://example.com/api/v1/users").body!!.string())
+
+        assertTrue(created.isJsonObject)
+        assertEquals("Lima", created.asJsonObject.getAsJsonObject("address").get("city").asString)
+        assertTrue(users.isJsonArray)
+        assertEquals(listOf(1, 2), users.asJsonArray.map { it.asJsonObject.get("id").asInt })
+        assertEquals("[]", client.get("http://example.com/api/v1/tags").body!!.string())
+        assertEquals("{}", client.get("http://example.com/api/v1/settings").body!!.string())
+    }
+
+    @Test
+    fun `plain array whose items have a statusCode field is served as it is`() {
+        val payload = """[ { "statusCode": 201 }, { "statusCode": 404 } ]"""
+        val provider = FakeProvider(mapOf("api/v1/events.json" to payload))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/events")
+
+        assertEquals(200, response.code)
+        assertEquals(payload, response.body!!.string())
     }
 
     private companion object {
