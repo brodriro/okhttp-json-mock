@@ -33,6 +33,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // SampleMocksTest reads the example mocks of the sample app.
+    inputs.dir(rootProject.file("app/src/main/assets")).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 mavenPublishing {
