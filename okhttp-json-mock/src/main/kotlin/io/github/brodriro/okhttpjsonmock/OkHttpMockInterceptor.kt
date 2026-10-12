@@ -1,6 +1,5 @@
 package io.github.brodriro.okhttpjsonmock
 
-import io.github.brodriro.okhttpjsonmock.helpers.ResourcesHelper
 import io.github.brodriro.okhttpjsonmock.providers.DefaultInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import okhttp3.HttpUrl
@@ -19,6 +18,7 @@ import kotlin.math.abs
  *
  * The file is chosen from the request URL: `/api/v1/users?page=1` is looked up as
  * `api/v1/users/page=1.json` and then as `api/v1/users.json`. Host, headers and body are ignored.
+ * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
  *
  * @param inputStreamProvider where mock files are read from.
@@ -89,7 +89,7 @@ public class OkHttpMockInterceptor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val candidates = candidatePaths(request.url)
-        val mock = candidates.firstNotNullOfOrNull { ResourcesHelper.loadFileAsString(inputStreamProvider, it) }
+        val mock = candidates.firstNotNullOfOrNull(::readMock)
         try {
             Thread.sleep(nextDelayMilliseconds())
         } catch (e: InterruptedException) {
@@ -100,12 +100,12 @@ public class OkHttpMockInterceptor(
             print("JsonMockServer: No mock found for ${request.url.encodedPath}\t\tStatusCode : $HTTP_NOT_FOUND")
             val explanation = "No mock file found for ${request.method} ${request.url.encodedPath}. " +
                 "Tried: ${candidates.joinToString()}"
-            return response(request, HTTP_NOT_FOUND, explanation, CONTENT_TYPE_TEXT)
+            return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
         val failure = abs(Random().nextInt() % 100) < failurePercentage
         if (failure) {
             print("JsonMockServer: Simulated failure for ${candidates.first()}\t\tStatusCode : $HTTP_GATEWAY_TIMEOUT")
-            return response(request, HTTP_GATEWAY_TIMEOUT, "", CONTENT_TYPE_JSON)
+            return response(request, HTTP_GATEWAY_TIMEOUT, ByteArray(0), CONTENT_TYPE_JSON)
         }
         print("JsonMockServer: Returning result from ${candidates.first()}\t\tStatusCode : $HTTP_OK")
         return response(request, HTTP_OK, mock, CONTENT_TYPE_JSON)
@@ -119,7 +119,10 @@ public class OkHttpMockInterceptor(
         return listOfNotNull(queryFile, "$basePath$path.json")
     }
 
-    private fun response(request: Request, code: Int, body: String, contentType: String): Response =
+    /** The raw bytes of the mock at [path], or `null` when the provider has no such file. */
+    private fun readMock(path: String): ByteArray? = inputStreamProvider.provide(path)?.use { it.readBytes() }
+
+    private fun response(request: Request, code: Int, body: ByteArray, contentType: String): Response =
         Response.Builder()
             .code(code)
             .message(reasonPhrase(code))

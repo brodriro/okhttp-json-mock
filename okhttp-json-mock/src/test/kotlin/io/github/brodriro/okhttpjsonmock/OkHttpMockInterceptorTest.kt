@@ -10,6 +10,7 @@ import okhttp3.Response
 import java.io.InterruptedIOException
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -272,6 +273,25 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users/1")
 
         assertEquals(Protocol.HTTP_1_1, response.protocol)
+    }
+
+    @Test
+    fun `mock bytes are returned untouched`() {
+        val content = "{\r\n  \"name\": \"Ñandú 日本\"\r\n}\n"
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to content))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/users/1")
+
+        assertContentEquals(content.toByteArray(Charsets.UTF_8), response.body!!.bytes())
+    }
+
+    @Test
+    fun `non ascii mocks decode as utf-8`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to """{"name":"Ñandú 日本"}"""))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/users/1")
+
+        assertEquals("""{"name":"Ñandú 日本"}""", response.body!!.string())
     }
 
     private companion object {
