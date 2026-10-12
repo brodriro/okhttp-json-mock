@@ -14,8 +14,11 @@ import kotlin.random.Random
 /**
  * Answers every request with the contents of a local JSON file instead of hitting the network.
  *
- * The file is chosen from the request URL: `/api/v1/users?page=1` is looked up as
- * `api/v1/users/page=1.json` and then as `api/v1/users.json`. Host, headers and body are ignored.
+ * The file is chosen from the request method and URL. `GET /api/v1/users?page=1` is looked up as
+ * `api/v1/users/page=1.get.json`, `api/v1/users.get.json`, `api/v1/users/page=1.json` and
+ * `api/v1/users.json`, in that order. A file with a method suffix (`users.post.json`) only answers
+ * that method, so one URL can have a different mock per method; a file without it answers any
+ * method. Host, headers and body are ignored.
  * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
@@ -97,7 +100,7 @@ public class OkHttpMockInterceptor private constructor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        val candidates = resolver.candidates(request.url)
+        val candidates = resolver.candidates(request.method, request.url)
         val match = candidates.firstNotNullOfOrNull { path -> readMock(path)?.let { path to it } }
         try {
             Thread.sleep(nextDelayMilliseconds())

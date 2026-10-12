@@ -55,7 +55,7 @@ class OkHttpMockInterceptorTest {
 
         assertEquals(200, response.code)
         assertEquals(USER, response.body!!.string())
-        assertEquals(listOf("api/v1/users/1.json"), provider.requestedPaths)
+        assertEquals(listOf("api/v1/users/1.get.json", "api/v1/users/1.json"), provider.requestedPaths)
     }
 
     @Test
@@ -74,7 +74,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users?page=1")
 
         assertEquals(USERS, response.body!!.string())
-        assertEquals(listOf("api/v1/users/page=1.json"), provider.requestedPaths)
+        assertEquals("api/v1/users/page=1.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -107,7 +107,15 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users?page=7")
 
         assertEquals(USERS, response.body!!.string())
-        assertEquals(listOf("api/v1/users/page=7.json", "api/v1/users.json"), provider.requestedPaths)
+        assertEquals(
+            listOf(
+                "api/v1/users/page=7.get.json",
+                "api/v1/users.get.json",
+                "api/v1/users/page=7.json",
+                "api/v1/users.json",
+            ),
+            provider.requestedPaths,
+        )
     }
 
     @Test
@@ -212,7 +220,8 @@ class OkHttpMockInterceptorTest {
         assertContains(body, "GET /api/v1/users")
         assertContains(body, "api/v1/users/page=1.json")
         assertContains(body, "api/v1/users.json")
-        assertEquals(listOf("api/v1/users/page=1.json", "api/v1/users.json"), provider.requestedPaths)
+        assertContains(body, "api/v1/users.get.json")
+        assertEquals(4, provider.requestedPaths.size)
     }
 
     @Test
@@ -305,7 +314,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/")
 
         assertEquals(USER, response.body!!.string())
-        assertEquals(listOf("index.json"), provider.requestedPaths)
+        assertEquals("index.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -315,7 +324,7 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/users/")
 
         assertEquals(USERS, response.body!!.string())
-        assertEquals(listOf("api/v1/users.json"), provider.requestedPaths)
+        assertEquals("api/v1/users.json", provider.requestedPaths.last())
     }
 
     @Test
@@ -357,7 +366,7 @@ class OkHttpMockInterceptorTest {
         val response = client.get("http://example.com/api/v1/users/1")
 
         assertEquals(504, response.code)
-        assertEquals(listOf("mocks/api/v1/users/1.json"), provider.requestedPaths)
+        assertEquals("mocks/api/v1/users/1.json", provider.requestedPaths.last())
         assertEquals(0, interceptor.maxDelayMilliseconds)
     }
 
@@ -405,7 +414,7 @@ class OkHttpMockInterceptorTest {
         assertEquals(
             listOf(
                 "GET /api/v1/users?page=1 -> 200 from api/v1/users/page=1.json",
-                "GET /api/v1/unknown -> 404, no mock found. Tried: api/v1/unknown.json",
+                "GET /api/v1/unknown -> 404, no mock found. Tried: api/v1/unknown.get.json, api/v1/unknown.json",
             ),
             lines,
         )
@@ -438,6 +447,69 @@ class OkHttpMockInterceptorTest {
             System.setOut(original)
         }
         return captured.toString()
+    }
+
+    @Test
+    fun `same url answers each http method with its own mock`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users.get.json" to """["list"]""",
+                "api/v1/users.post.json" to """{"created":true}""",
+                "api/v1/users.put.json" to """{"replaced":true}""",
+                "api/v1/users.delete.json" to """{"deleted":true}""",
+            ),
+        )
+        val client = clientFor(provider)
+        val url = "http://example.com/api/v1/users"
+
+        assertEquals("""["list"]""", client.call("GET", url))
+        assertEquals("""{"created":true}""", client.call("POST", url))
+        assertEquals("""{"replaced":true}""", client.call("PUT", url))
+        assertEquals("""{"deleted":true}""", client.call("DELETE", url))
+    }
+
+    @Test
+    fun `method mock wins over the mock shared by every method`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users.json" to """["shared"]""",
+                "api/v1/users.post.json" to """{"created":true}""",
+            ),
+        )
+        val client = clientFor(provider)
+        val url = "http://example.com/api/v1/users"
+
+        assertEquals("""{"created":true}""", client.call("POST", url))
+        assertEquals("""["shared"]""", client.call("GET", url))
+        assertEquals("""["shared"]""", client.call("DELETE", url))
+    }
+
+    @Test
+    fun `method mock can be specific to a query string`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/users/page=1.get.json" to """["page 1"]""",
+                "api/v1/users.get.json" to """["any page"]""",
+            ),
+        )
+        val client = clientFor(provider)
+
+        assertEquals("""["page 1"]""", client.call("GET", "http://example.com/api/v1/users?page=1"))
+        assertEquals("""["any page"]""", client.call("GET", "http://example.com/api/v1/users?page=2"))
+    }
+
+    @Test
+    fun `a mock for another method does not answer the request`() {
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"created":true}"""))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/users")
+
+        assertEquals(404, response.code)
+    }
+
+    private fun OkHttpClient.call(method: String, url: String): String {
+        val body = if (method == "GET") null else "{}".toRequestBody("application/json".toMediaType())
+        return newCall(Request.Builder().url(url).method(method, body).build()).execute().body!!.string()
     }
 
     private companion object {

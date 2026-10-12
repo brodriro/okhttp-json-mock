@@ -6,33 +6,61 @@ import kotlin.test.assertEquals
 
 class MockFileResolverTest {
 
-    private fun candidates(url: String, basePath: String = "") =
-        MockFileResolver(basePath).candidates(url.toHttpUrl())
+    private fun candidates(method: String, url: String, basePath: String = "") =
+        MockFileResolver(basePath).candidates(method, url.toHttpUrl())
 
     @Test
-    fun `path without query has a single candidate`() {
-        assertEquals(listOf("api/v1/users/1.json"), candidates("http://example.com/api/v1/users/1"))
+    fun `method file comes before the file shared by every method`() {
+        assertEquals(
+            listOf("api/v1/users/1.get.json", "api/v1/users/1.json"),
+            candidates("GET", "http://example.com/api/v1/users/1"),
+        )
     }
 
     @Test
-    fun `query file comes before the path file`() {
+    fun `each method has its own file for the same url`() {
+        val url = "http://example.com/api/v1/users"
+
+        assertEquals("api/v1/users.get.json", candidates("GET", url).first())
+        assertEquals("api/v1/users.post.json", candidates("POST", url).first())
+        assertEquals("api/v1/users.put.json", candidates("PUT", url).first())
+        assertEquals("api/v1/users.delete.json", candidates("DELETE", url).first())
+        assertEquals("api/v1/users.patch.json", candidates("PATCH", url).first())
+    }
+
+    @Test
+    fun `with a query the order is method then shared, query file before path file`() {
         assertEquals(
-            listOf("api/v1/users/page=1.json", "api/v1/users.json"),
-            candidates("http://example.com/api/v1/users?page=1"),
+            listOf(
+                "api/v1/users/page=1.get.json",
+                "api/v1/users.get.json",
+                "api/v1/users/page=1.json",
+                "api/v1/users.json",
+            ),
+            candidates("GET", "http://example.com/api/v1/users?page=1"),
         )
+    }
+
+    @Test
+    fun `method suffix is lower case whatever the request uses`() {
+        assertEquals("api/v1/users.post.json", candidates("post", "http://example.com/api/v1/users").first())
+        assertEquals("api/v1/users.post.json", candidates("Post", "http://example.com/api/v1/users").first())
     }
 
     @Test
     fun `base path prefixes every candidate`() {
         assertEquals(
-            listOf("mocks/api/v1/users/page=1.json", "mocks/api/v1/users.json"),
-            candidates("http://example.com/api/v1/users?page=1", basePath = "mocks/"),
+            listOf("mocks/api/v1/users.delete.json", "mocks/api/v1/users.json"),
+            candidates("DELETE", "http://example.com/api/v1/users", basePath = "mocks/"),
         )
     }
 
     @Test
     fun `root path and trailing slash are normalised`() {
-        assertEquals(listOf("index.json"), candidates("http://example.com/"))
-        assertEquals(listOf("api/v1/users.json"), candidates("http://example.com/api/v1/users/"))
+        assertEquals(listOf("index.get.json", "index.json"), candidates("GET", "http://example.com/"))
+        assertEquals(
+            listOf("api/v1/users.get.json", "api/v1/users.json"),
+            candidates("GET", "http://example.com/api/v1/users/"),
+        )
     }
 }
