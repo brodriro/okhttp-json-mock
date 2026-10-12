@@ -21,7 +21,7 @@ import kotlin.math.abs
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
  *
  * @param inputStreamProvider where mock files are read from.
- * @param failurePercentage chance, from 0 to 100, of answering with a failure status.
+ * @param failurePercentage chance, from 0 to 100, of answering with a 504 and an empty body.
  * @param basePath prefix added to every resolved file path.
  * @param minDelayMilliseconds lower bound of the simulated latency.
  * @param maxDelayMilliseconds upper bound, exclusive, of the simulated latency. Equal bounds give a fixed latency.
@@ -100,9 +100,12 @@ public class OkHttpMockInterceptor(
             return response(request, HTTP_NOT_FOUND, explanation, CONTENT_TYPE_TEXT)
         }
         val failure = abs(Random().nextInt() % 100) < failurePercentage
-        val statusCode = if (failure) 504 else 200
-        print("JsonMockServer: Returning result from ${candidates.first()}\t\tStatusCode : $statusCode")
-        return response(request, statusCode, mock, CONTENT_TYPE_JSON)
+        if (failure) {
+            print("JsonMockServer: Simulated failure for ${candidates.first()}\t\tStatusCode : $HTTP_GATEWAY_TIMEOUT")
+            return response(request, HTTP_GATEWAY_TIMEOUT, "", CONTENT_TYPE_JSON)
+        }
+        print("JsonMockServer: Returning result from ${candidates.first()}\t\tStatusCode : $HTTP_OK")
+        return response(request, HTTP_OK, mock, CONTENT_TYPE_JSON)
     }
 
     /** Files that can answer [url], most specific first. */
@@ -173,7 +176,9 @@ public class OkHttpMockInterceptor(
         const val DEFAULT_BASE_PATH = ""
         const val DELAY_DEFAULT_MIN = 500
         const val DELAY_DEFAULT_MAX = 1500
+        const val HTTP_OK = 200
         const val HTTP_NOT_FOUND = 404
+        const val HTTP_GATEWAY_TIMEOUT = 504
         const val CONTENT_TYPE_JSON = "application/json"
         const val CONTENT_TYPE_TEXT = "text/plain"
     }

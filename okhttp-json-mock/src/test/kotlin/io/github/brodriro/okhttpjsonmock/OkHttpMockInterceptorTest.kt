@@ -228,6 +228,16 @@ class OkHttpMockInterceptorTest {
         assertEquals("Not Found", missing.message)
     }
 
+    @Test
+    fun `simulated failure does not return the mock body`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to USER))
+
+        val response = clientFor(provider, failurePercentage = 100).get("http://example.com/api/v1/users/1")
+
+        assertEquals(504, response.code)
+        assertEquals("", response.body!!.string())
+    }
+
     private companion object {
         const val USER = """{"id":1,"name":"John"}"""
         const val NUMBERS = """["0123456789"]"""
