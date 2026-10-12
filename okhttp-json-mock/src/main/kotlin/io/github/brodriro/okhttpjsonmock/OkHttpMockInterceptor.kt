@@ -25,20 +25,23 @@ import kotlin.random.Random
  * of the constructors kept from 3.0.
  *
  * @param inputStreamProvider where mock files are read from.
- * @property failurePercentage chance, from 0 to 100, of answering with a 504 and an empty body.
+ * @property failurePercentage chance, from 0 to 100, of answering with [failureCode] and an empty body.
  * @property basePath prefix added to every resolved file path.
  * @property minDelayMilliseconds lower bound of the simulated latency.
  * @property maxDelayMilliseconds upper bound, exclusive, of the simulated latency. Equal bounds give a fixed latency.
+ * @property failureCode HTTP status of a simulated failure, 504 unless set through [Builder].
  */
-public class OkHttpMockInterceptor(
+public class OkHttpMockInterceptor private constructor(
     private val inputStreamProvider: InputStreamProvider,
     public val failurePercentage: Int,
     public val basePath: String,
     public val minDelayMilliseconds: Int,
     public val maxDelayMilliseconds: Int,
+    public val failureCode: Int,
 ) : Interceptor {
 
     init {
+        require(failureCode in 400..599) { "failureCode must be a 4xx or 5xx status: $failureCode" }
         require(failurePercentage in 0..100) { "failurePercentage must be between 0 and 100: $failurePercentage" }
         require(minDelayMilliseconds >= 0) { "minDelayMilliseconds must not be negative: $minDelayMilliseconds" }
         require(maxDelayMilliseconds >= minDelayMilliseconds) {
@@ -46,6 +49,22 @@ public class OkHttpMockInterceptor(
                 "minDelayMilliseconds ($minDelayMilliseconds)"
         }
     }
+
+    /** Reads mocks from [inputStreamProvider] under [basePath] with a custom latency window. */
+    public constructor(
+        inputStreamProvider: InputStreamProvider,
+        failurePercentage: Int,
+        basePath: String,
+        minDelayMilliseconds: Int,
+        maxDelayMilliseconds: Int,
+    ) : this(
+        inputStreamProvider,
+        failurePercentage,
+        basePath,
+        minDelayMilliseconds,
+        maxDelayMilliseconds,
+        DEFAULT_FAILURE_CODE,
+    )
 
     /** Reads mocks from the filesystem with the default latency. */
     public constructor(failurePercentage: Int) : this(DefaultInputStreamProvider(), failurePercentage)
@@ -90,8 +109,8 @@ public class OkHttpMockInterceptor(
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
         if (Random.nextInt(100) < failurePercentage) {
-            print("JsonMockServer: Simulated failure for ${candidates.first()}\t\tStatusCode : $HTTP_GATEWAY_TIMEOUT")
-            return response(request, HTTP_GATEWAY_TIMEOUT, ByteArray(0), CONTENT_TYPE_JSON)
+            print("JsonMockServer: Simulated failure for ${candidates.first()}\t\tStatusCode : $failureCode")
+            return response(request, failureCode, ByteArray(0), CONTENT_TYPE_JSON)
         }
         print("JsonMockServer: Returning result from ${candidates.first()}\t\tStatusCode : $HTTP_OK")
         return response(request, HTTP_OK, mock, CONTENT_TYPE_JSON)
@@ -157,6 +176,7 @@ public class OkHttpMockInterceptor(
         private var basePath = DEFAULT_BASE_PATH
         private var minDelayMilliseconds = DELAY_DEFAULT_MIN
         private var maxDelayMilliseconds = DELAY_DEFAULT_MAX
+        private var failureCode = DEFAULT_FAILURE_CODE
 
         /** Reads mocks from the filesystem. */
         public constructor() : this(DefaultInputStreamProvider())
@@ -165,6 +185,9 @@ public class OkHttpMockInterceptor(
         public fun failurePercentage(failurePercentage: Int): Builder = apply {
             this.failurePercentage = failurePercentage
         }
+
+        /** HTTP status of a simulated failure. Must be a 4xx or 5xx code; 504 by default. */
+        public fun failureCode(failureCode: Int): Builder = apply { this.failureCode = failureCode }
 
         /** Prefix added to every resolved file path, for example `mocks/`. */
         public fun basePath(basePath: String): Builder = apply { this.basePath = basePath }
@@ -185,6 +208,7 @@ public class OkHttpMockInterceptor(
             basePath,
             minDelayMilliseconds,
             maxDelayMilliseconds,
+            failureCode,
         )
     }
 
@@ -195,7 +219,7 @@ public class OkHttpMockInterceptor(
         const val ROOT_FILE_NAME = "index"
         const val HTTP_OK = 200
         const val HTTP_NOT_FOUND = 404
-        const val HTTP_GATEWAY_TIMEOUT = 504
+        const val DEFAULT_FAILURE_CODE = 504
         const val CONTENT_TYPE_JSON = "application/json"
         const val CONTENT_TYPE_TEXT = "text/plain"
     }

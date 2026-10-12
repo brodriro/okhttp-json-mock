@@ -366,6 +366,30 @@ class OkHttpMockInterceptorTest {
         assertFailsWith<IllegalArgumentException> { builder.failurePercentage(150).build() }
     }
 
+    @Test
+    fun `simulated failures use the configured status code`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to USER))
+        val interceptor = OkHttpMockInterceptor.Builder(provider)
+            .failurePercentage(100)
+            .failureCode(503)
+            .noDelay()
+            .build()
+
+        val response = OkHttpClient.Builder().addInterceptor(interceptor).build()
+            .get("http://example.com/api/v1/users/1")
+
+        assertEquals(503, response.code)
+        assertEquals("Service Unavailable", response.message)
+    }
+
+    @Test
+    fun `failure code must be an error status`() {
+        val builder = OkHttpMockInterceptor.Builder(FakeProvider(emptyMap()))
+
+        assertEquals(504, builder.build().failureCode)
+        assertFailsWith<IllegalArgumentException> { builder.failureCode(200).build() }
+    }
+
     private companion object {
         const val USER = """{"id":1,"name":"John"}"""
         const val NUMBERS = """["0123456789"]"""
