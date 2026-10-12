@@ -21,7 +21,7 @@ import kotlin.math.abs
  * @param failurePercentage chance, from 0 to 100, of answering with a failure status.
  * @param basePath prefix added to every resolved file path.
  * @param minDelayMilliseconds lower bound of the simulated latency.
- * @param maxDelayMilliseconds upper bound, exclusive, of the simulated latency.
+ * @param maxDelayMilliseconds upper bound, exclusive, of the simulated latency. Equal bounds give a fixed latency.
  */
 public class OkHttpMockInterceptor(
     private val inputStreamProvider: InputStreamProvider,
@@ -46,6 +46,14 @@ public class OkHttpMockInterceptor(
     /** Upper bound, exclusive, of the simulated latency. */
     public var maxDelayMilliseconds: Int = maxDelayMilliseconds
         private set
+
+    init {
+        require(minDelayMilliseconds >= 0) { "minDelayMilliseconds must not be negative: $minDelayMilliseconds" }
+        require(maxDelayMilliseconds >= minDelayMilliseconds) {
+            "maxDelayMilliseconds ($maxDelayMilliseconds) must not be lower than " +
+                "minDelayMilliseconds ($minDelayMilliseconds)"
+        }
+    }
 
     /** Reads mocks from the filesystem with the default latency. */
     public constructor(failurePercentage: Int) : this(DefaultInputStreamProvider(), failurePercentage)
@@ -87,10 +95,7 @@ public class OkHttpMockInterceptor(
         )
         val result = responseString.orEmpty()
         try {
-            Thread.sleep(
-                (abs(Random().nextInt() % (maxDelayMilliseconds - minDelayMilliseconds)) + minDelayMilliseconds)
-                    .toLong(),
-            )
+            Thread.sleep(nextDelayMilliseconds())
         } catch (e: InterruptedException) {
             e.printStackTrace()
         }
@@ -106,6 +111,13 @@ public class OkHttpMockInterceptor(
             .body(result.toResponseBody("application/json".toMediaType()))
             .addHeader("content-type", "application/json")
             .build()
+    }
+
+    /** A latency in `[min, max)`, or exactly `min` when both bounds are equal. */
+    private fun nextDelayMilliseconds(): Long {
+        val window = maxDelayMilliseconds - minDelayMilliseconds
+        val jitter = if (window > 0) Random().nextInt(window) else 0
+        return (minDelayMilliseconds + jitter).toLong()
     }
 
     /** Changes [failurePercentage]. */

@@ -8,6 +8,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * Pins the behaviour inherited from 3.0 so the Kotlin migration and the
@@ -169,6 +170,26 @@ class OkHttpMockInterceptorTest {
         val codes = List(50) { client.get("http://example.com/api/v1/users/1").use { it.code } }
 
         assertEquals(setOf(504), codes.toSet())
+    }
+
+    @Test
+    fun `equal delay bounds give a fixed delay instead of failing`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to USER))
+        val client = OkHttpClient.Builder()
+            .addInterceptor(OkHttpMockInterceptor(provider, 0, 0, 0))
+            .build()
+
+        val response = client.get("http://example.com/api/v1/users/1")
+
+        assertEquals(200, response.code)
+    }
+
+    @Test
+    fun `delay bounds are validated on construction`() {
+        val provider = FakeProvider(emptyMap())
+
+        assertFailsWith<IllegalArgumentException> { OkHttpMockInterceptor(provider, 0, 10, 5) }
+        assertFailsWith<IllegalArgumentException> { OkHttpMockInterceptor(provider, 0, -1, 5) }
     }
 
     private companion object {
