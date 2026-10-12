@@ -54,3 +54,9 @@ freeline.py
 freeline/
 freeline_project_description.json
 .idea/
+
+# Kotlin
+.kotlin/
+
+# Claude Code local rules
+.claude/rules/
