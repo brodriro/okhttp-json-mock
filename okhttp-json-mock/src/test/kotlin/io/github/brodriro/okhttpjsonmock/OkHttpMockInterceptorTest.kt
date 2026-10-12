@@ -8,6 +8,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InterruptedIOException
 import java.io.PrintStream
 import java.util.concurrent.Callable
@@ -533,6 +534,89 @@ class OkHttpMockInterceptorTest {
         val response = clientFor(provider).get("http://example.com/api/v1/posts?page=1&categoryId=5")
 
         assertEquals(USER, response.body!!.string())
+    }
+
+    @Test
+    fun `mock with a statusCode envelope answers with that status and the wrapped response`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/users.post.json" to """{ "statusCode": 201, "response": { "id": 4, "name": "Ana" } }"""),
+        )
+
+        val response = clientFor(provider).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(201, response.code)
+        assertEquals("Created", response.message)
+        assertEquals("""{"id":4,"name":"Ana"}""", response.body!!.string())
+    }
+
+    @Test
+    fun `envelope without response answers with an empty body`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.delete.json" to """{ "statusCode": 204 }"""))
+
+        val response = clientFor(provider).send("DELETE", "http://example.com/api/v1/users/1")
+
+        assertEquals(204, response.code)
+        assertEquals("", response.body!!.string())
+    }
+
+    @Test
+    fun `envelope can describe an error response`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/login.post.json" to """{"statusCode":401,"response":{"error":"bad credentials"}}"""),
+        )
+
+        val response = clientFor(provider).send("POST", "http://example.com/api/v1/login")
+
+        assertEquals(401, response.code)
+        assertEquals("""{"error":"bad credentials"}""", response.body!!.string())
+    }
+
+    @Test
+    fun `real payload that has a statusCode field is served as it is`() {
+        val payload = """{ "statusCode": 404, "message": "Not found" }"""
+        val provider = FakeProvider(mapOf("api/v1/errors/last.json" to payload))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/errors/last")
+
+        assertEquals(200, response.code)
+        assertEquals(payload, response.body!!.string())
+    }
+
+    @Test
+    fun `envelope with an invalid status code fails the call naming the file`() {
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"statusCode":"created"}"""))
+
+        val error = assertFailsWith<IOException> {
+            clientFor(provider).send("POST", "http://example.com/api/v1/users")
+        }
+
+        assertContains(error.message!!, "api/v1/users.post.json")
+    }
+
+    @Test
+    fun `simulated failure wins over the status code of the envelope`() {
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"statusCode":201,"response":{"id":4}}"""))
+
+        val response = clientFor(provider, failurePercentage = 100).send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(504, response.code)
+        assertEquals("", response.body!!.string())
+    }
+
+    @Test
+    fun `log line reports the status code of the envelope`() {
+        val lines = mutableListOf<String>()
+        val provider = FakeProvider(mapOf("api/v1/users.post.json" to """{"statusCode":201,"response":{"id":4}}"""))
+        val interceptor = OkHttpMockInterceptor.Builder(provider).noDelay().logger { lines += it }.build()
+
+        OkHttpClient.Builder().addInterceptor(interceptor).build().send("POST", "http://example.com/api/v1/users")
+
+        assertEquals(listOf("POST /api/v1/users -> 201 from api/v1/users.post.json"), lines)
+    }
+
+    private fun OkHttpClient.send(method: String, url: String): Response {
+        val body = if (method == "GET") null else "{}".toRequestBody("application/json".toMediaType())
+        return newCall(Request.Builder().url(url).method(method, body).build()).execute()
     }
 
     private companion object {

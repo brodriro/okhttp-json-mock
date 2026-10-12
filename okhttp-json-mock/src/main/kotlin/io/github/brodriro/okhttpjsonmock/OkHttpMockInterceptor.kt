@@ -19,6 +19,12 @@ import kotlin.random.Random
  * `api/v1/users.json`, in that order. A file with a method suffix (`users.post.json`) only answers
  * that method, so one URL can have a different mock per method; a file without it answers any
  * method. Host, headers and body are ignored.
+ *
+ * A mock is answered as it is with status 200. To answer with another status, wrap it:
+ * `{ "statusCode": 201, "response": { "id": 4 } }` answers 201 with `{"id":4}` as the body, and
+ * `{ "statusCode": 204 }` answers 204 with no body. A file is only treated as a wrapper when
+ * `statusCode` and `response` are its only keys, so real payloads that happen to have a
+ * `statusCode` field are left alone.
  * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
@@ -116,12 +122,14 @@ public class OkHttpMockInterceptor private constructor(
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
         val (path, mock) = match
+        val envelope = MockEnvelope.parseOrNull(mock, path)
         if (Random.nextInt(100) < failurePercentage) {
             logger.log("$call -> $failureCode, simulated failure")
             return response(request, failureCode, ByteArray(0), CONTENT_TYPE_JSON)
         }
-        logger.log("$call -> $HTTP_OK from $path")
-        return response(request, HTTP_OK, mock, CONTENT_TYPE_JSON)
+        val statusCode = envelope?.statusCode ?: HTTP_OK
+        logger.log("$call -> $statusCode from $path")
+        return response(request, statusCode, envelope?.body ?: mock, CONTENT_TYPE_JSON)
     }
 
     /** The raw bytes of the mock at [path], or `null` when the provider has no such file. */

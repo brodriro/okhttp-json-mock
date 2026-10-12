@@ -23,6 +23,7 @@ kotlin {
 
 dependencies {
     api(libs.okhttp)
+    implementation(libs.gson)
 
     testImplementation(kotlin("test"))
     testImplementation(platform(libs.junit.bom))
