@@ -228,8 +228,18 @@ api/v1/
 3. If you called the setters (`setBasePath`, `setFailurePercentage`, ...), use `OkHttpMockInterceptor.Builder`
    instead. Instances are now immutable.
 
+4. In Kotlin, a provider written as `object : InputStreamProvider` must declare the parameter as
+   non-null: `override fun provide(path: String): InputStream?`. It can also become a lambda:
+   `InputStreamProvider { path -> ... }`.
+
 The constructors of 3.0, such as `new OkHttpMockInterceptor(provider, 5)`, and your existing mock files
 keep working.
+
+If your provider does more than open the file it is asked for, check it. For each request it is now
+asked for the method files first (`users/1.get.json`) and then for the shared ones (`users/1.json`).
+A provider that answers an unknown name with a fallback file, for example a generic `users/_id.json`,
+has to tell the method suffix apart from the last path segment, or it will answer the method file with
+the wrong fallback.
 
 Behaviour that changed:
 
