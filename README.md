@@ -21,8 +21,7 @@ contents of a file whose path mirrors the request URL, so the real network is ne
 
 ## Installation
 
-> 4.0.0 is not released yet. It will be published to Maven Central with the coordinates below.
-> Until then, the latest released version is 3.0 from the original repository.
+The library is on Maven Central:
 
 ```kotlin
 dependencies {
@@ -241,7 +240,7 @@ Behaviour that changed:
 
 ## Changelog
 
-4.0.0 (unreleased) - `Kotlin, mocks per HTTP method, status code and headers per mock, 404 for missing mocks, Builder`
+4.0.0 - `Kotlin, mocks per HTTP method, status code and headers per mock, 404 for missing mocks, Builder`
 
 3.0 - `Removed wrapper for mocked responses`
 
