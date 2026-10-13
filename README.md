@@ -16,6 +16,7 @@ contents of a file whose path mirrors the request URL, so the real network is ne
 
 - **One URL, several HTTP methods.** `users.get.json` and `users.post.json` answer `GET /users` and `POST /users`.
 - **Status code and headers per mock**, written inside the mock file itself.
+- **Paths with ids.** `users/{id}.json` answers `/users/1`, `/users/42` and any other id.
 - **404 instead of a crash** when no mock matches, with the list of files that were tried.
 - Written in Kotlin, still usable from Java. Works on any JVM project, not only Android.
 
@@ -96,6 +97,22 @@ With several parameters, the file can be named in the order the request uses or 
 sorted alphabetically (`categoryId=5&page=1.json`). The sorted name answers the request whatever order
 the client builds the query in.
 
+## Paths with ids
+
+Name a file or a folder `{id}`, braces included, to answer any value in that position of the path:
+
+```
+api/v1/users/{id}.json               GET /api/v1/users/1, /api/v1/users/42, ...
+api/v1/users/{id}/phoneNumbers.json  GET /api/v1/users/7/phoneNumbers
+api/v1/users/{id}.delete.json        DELETE /api/v1/users/<any id>
+```
+
+The name is always `{id}`, whatever the parameter is called in your API. A file for the exact path
+wins over `{id}`, so `users/search.json` and `users/1.json` keep answering their own URLs. Up to two
+segments of a path can be `{id}`, as in `orders/{id}/items/{id}.json`.
+
+On Android these files go in `assets` like any other mock. No build configuration is needed.
+
 ## One URL, different HTTP methods
 
 Put the HTTP method, in lower case, before the extension:
@@ -115,6 +132,8 @@ For `GET /api/v1/users?page=1` the interceptor uses the first of these files tha
 2. `api/v1/users.get.json`
 3. `api/v1/users/page=1.json`
 4. `api/v1/users.json`
+
+Only when none of them exists does it try the same four names with `{id}` in place of a path segment.
 
 ## The response: objects, arrays, status codes and headers
 
@@ -198,7 +217,7 @@ JsonMockServer: POST /api/v1/users -> 201 from api/v1/users.post.json
 The interceptor answers `404` with a plain-text body that lists the files it looked for:
 
 ```
-No mock file found for GET /api/v1/unknown. Tried: api/v1/unknown.get.json, api/v1/unknown.json
+No mock file found for GET /api/v1/unknown. Tried: api/v1/unknown.get.json, api/v1/unknown.json and 12 more with {id} in place of a path segment
 ```
 
 ## Example
@@ -215,6 +234,7 @@ api/v1/
     ├── 1.put.json             PUT    /api/v1/users/1     plain object
     ├── 1.delete.json          DELETE /api/v1/users/1     204, no body
     ├── 9.get.json             GET    /api/v1/users/9     404 with an error body
+    ├── {id}.json              GET    /api/v1/users/<any other id>
     ├── 2.json
     ├── 3.json
     └── 1/
@@ -240,6 +260,8 @@ asked for the method files first (`users/1.get.json`) and then for the shared on
 A provider that answers an unknown name with a fallback file, for example a generic `users/_id.json`,
 has to tell the method suffix apart from the last path segment, or it will answer the method file with
 the wrong fallback.
+If the fallback only exists to answer any id, drop it and name the file `{id}.json` instead (see
+[Paths with ids](#paths-with-ids)).
 
 Behaviour that changed:
 
@@ -250,7 +272,7 @@ Behaviour that changed:
 
 ## Changelog
 
-4.0.0 - `Kotlin, mocks per HTTP method, status code and headers per mock, 404 for missing mocks, Builder`
+4.0.0 - `Kotlin, mocks per HTTP method, status code and headers per mock, {id} paths, 404 for missing mocks, Builder`
 
 3.0 - `Removed wrapper for mocked responses`
 

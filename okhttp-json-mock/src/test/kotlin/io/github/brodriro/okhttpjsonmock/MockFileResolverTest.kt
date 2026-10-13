@@ -6,7 +6,11 @@ import kotlin.test.assertEquals
 
 class MockFileResolverTest {
 
+    /** Candidates for the path exactly as requested, which is what most tests are about. */
     private fun candidates(method: String, url: String, basePath: String = "") =
+        allCandidates(method, url, basePath).filterNot { "{id}" in it }
+
+    private fun allCandidates(method: String, url: String, basePath: String = "") =
         MockFileResolver(basePath).candidates(method, url.toHttpUrl())
 
     @Test
@@ -81,6 +85,68 @@ class MockFileResolverTest {
         assertEquals(
             listOf("api/v1/users.get.json", "api/v1/users.json"),
             candidates("GET", "http://example.com/api/v1/users/"),
+        )
+    }
+
+    @Test
+    fun `a path segment can be replaced by the id placeholder, last segments first`() {
+        assertEquals(
+            listOf(
+                "users/7/posts.get.json",
+                "users/7/{id}.get.json",
+                "users/{id}/posts.get.json",
+                "{id}/7/posts.get.json",
+                "users/{id}/{id}.get.json",
+                "{id}/7/{id}.get.json",
+                "{id}/{id}/posts.get.json",
+            ),
+            allCandidates("GET", "http://example.com/users/7/posts").filter { it.endsWith(".get.json") },
+        )
+    }
+
+    @Test
+    fun `exact path comes before the placeholder paths, method before shared for each path`() {
+        assertEquals(
+            listOf(
+                "users/1.delete.json",
+                "users/1.json",
+                "users/{id}.delete.json",
+                "users/{id}.json",
+                "{id}/1.delete.json",
+                "{id}/1.json",
+                "{id}/{id}.delete.json",
+                "{id}/{id}.json",
+            ),
+            allCandidates("DELETE", "http://example.com/users/1"),
+        )
+    }
+
+    @Test
+    fun `placeholder paths keep the query files`() {
+        assertEquals(
+            listOf("users/{id}/page=2.get.json", "users/{id}.get.json", "users/{id}/page=2.json", "users/{id}.json"),
+            allCandidates("GET", "http://example.com/users/1?page=2").filter { it.startsWith("users/{id}") },
+        )
+    }
+
+    @Test
+    fun `at most two segments are replaced`() {
+        val candidates = allCandidates("GET", "http://example.com/a/b/c/d")
+
+        assertEquals(0, candidates.count { it.split("{id}").size - 1 > 2 })
+        assertEquals(2 * (1 + 4 + 6), candidates.size)
+    }
+
+    @Test
+    fun `root path has no placeholder candidates`() {
+        assertEquals(listOf("index.get.json", "index.json"), allCandidates("GET", "http://example.com/"))
+    }
+
+    @Test
+    fun `base path is never replaced`() {
+        assertEquals(
+            listOf("mocks/users.get.json", "mocks/users.json", "mocks/{id}.get.json", "mocks/{id}.json"),
+            allCandidates("GET", "http://example.com/users", basePath = "mocks/"),
         )
     }
 }

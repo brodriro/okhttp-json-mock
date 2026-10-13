@@ -94,4 +94,11 @@ class SampleMocksTest {
         /** The test task runs in the library module folder. */
         const val SAMPLE_ASSETS = "../app/src/main/assets/"
     }
+
+    @Test
+    fun `get of a user without its own file returns the generic one`() {
+        val user = JsonParser.parseString(send("GET", "api/v1/users/42").body!!.string())
+
+        assertEquals("Generic", user.asJsonObject.get("name").asString)
+    }
 }
