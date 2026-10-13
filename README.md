@@ -1,5 +1,9 @@
 # okhttp-json-mock
 
+[![CI](https://github.com/brodriro/okhttp-json-mock/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/brodriro/okhttp-json-mock/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.brodriro/okhttp-json-mock)](https://central.sonatype.com/artifact/io.github.brodriro/okhttp-json-mock)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
 Mock your OkHttp and Retrofit calls with local JSON files. An interceptor answers every request with the
 contents of a file whose path mirrors the request URL, so the real network is never used.
 
@@ -251,6 +255,9 @@ Behaviour that changed:
 
 Contributions are welcome. Branch from `develop` and open a pull request against `develop`.
 
+Run `./gradlew build` before opening it: it runs the tests, ktlint and Android lint, the same checks
+as the CI. `./gradlew ktlintFormat` fixes most style problems.
+
 ## License
 
-[Apache License 2.0](LICENSE).
+[Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for the attribution to the original project.

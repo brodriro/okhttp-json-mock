@@ -3,6 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     `java-library`
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.ktlint)
     alias(libs.plugins.maven.publish)
 }
 
@@ -35,6 +37,13 @@ tasks.test {
     useJUnitPlatform()
     // SampleMocksTest reads the example mocks of the sample app.
     inputs.dir(rootProject.file("app/src/main/assets")).withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+// The Apache License asks redistributions to carry the license and the attribution notice.
+tasks.withType<Jar>().configureEach {
+    from(rootProject.files("LICENSE", "NOTICE")) {
+        into("META-INF")
+    }
 }
 
 mavenPublishing {

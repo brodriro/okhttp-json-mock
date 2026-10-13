@@ -70,7 +70,9 @@ class MockEnvelopeTest {
 
     @Test
     fun `content type is kept apart from the other headers`() {
-        val envelope = parse("""{"statusCode":200,"headers":{"content-type":"text/plain","X-Trace":"1"},"response":"ok"}""")!!
+        val envelope = parse(
+            """{"statusCode":200,"headers":{"content-type":"text/plain","X-Trace":"1"},"response":"ok"}""",
+        )!!
 
         assertEquals("text/plain", envelope.contentType)
         assertEquals(listOf("X-Trace" to "1"), envelope.headers)

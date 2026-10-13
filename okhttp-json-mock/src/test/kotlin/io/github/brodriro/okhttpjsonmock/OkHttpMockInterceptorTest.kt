@@ -1,7 +1,7 @@
 package io.github.brodriro.okhttpjsonmock
 
-import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import com.google.gson.JsonParser
+import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -47,8 +47,7 @@ class OkHttpMockInterceptorTest {
         return OkHttpClient.Builder().addInterceptor(interceptor).build()
     }
 
-    private fun OkHttpClient.get(url: String): Response =
-        newCall(Request.Builder().url(url).build()).execute()
+    private fun OkHttpClient.get(url: String): Response = newCall(Request.Builder().url(url).build()).execute()
 
     @Test
     fun `path without query resolves to the json file with the same path`() {
@@ -651,7 +650,10 @@ class OkHttpMockInterceptorTest {
     @Test
     fun `envelope content type header replaces the default`() {
         val provider = FakeProvider(
-            mapOf("api/v1/health.json" to """{"statusCode":200,"headers":{"Content-Type":"text/plain"},"response":"ok"}"""),
+            mapOf(
+                "api/v1/health.json" to
+                    """{"statusCode":200,"headers":{"Content-Type":"text/plain"},"response":"ok"}""",
+            ),
         )
 
         val response = clientFor(provider).get("http://example.com/api/v1/health")

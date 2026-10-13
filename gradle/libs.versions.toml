@@ -2,6 +2,8 @@
 agp = "9.4.1"
 kotlin = "2.4.21"
 mavenPublish = "0.37.0"
+dokka = "2.2.0"
+ktlint = "14.2.0"
 okhttp = "4.12.0"
 gson = "2.14.0"
 retrofit = "3.0.0"
@@ -27,4 +29,6 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }
