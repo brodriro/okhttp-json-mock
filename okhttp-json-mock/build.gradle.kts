@@ -74,6 +74,7 @@ mavenPublishing {
             developer {
                 id = "brodriro"
                 name = "Brian Rodriguez"
+                email = "brian.rodriro@gmail.com"
                 url = "https://github.com/brodriro"
             }
         }
