@@ -26,6 +26,8 @@ import kotlin.random.Random
  * in an optional `"headers": { "Location": "/users/4" }` object. A file is only treated as a
  * wrapper when it has `statusCode` and no keys other than `statusCode`, `headers` and `response`,
  * so real payloads that happen to have a `statusCode` field are left alone.
+ * A file or folder named `{id}` matches any value of a path segment, so `users/{id}.json` answers
+ * `/users/1` and `/users/42` when there is no file for that exact path.
  * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
@@ -117,7 +119,10 @@ public class OkHttpMockInterceptor private constructor(
         }
         val call = "${request.method} ${request.url.encodedPath}" + request.url.encodedQuery?.let { "?$it" }.orEmpty()
         if (match == null) {
-            val tried = candidates.joinToString()
+            val exact = candidates.filterNot { MockFileResolver.PLACEHOLDER in it }
+            val withPlaceholder = candidates.size - exact.size
+            val tried = exact.joinToString() +
+                if (withPlaceholder > 0) " and $withPlaceholder more with {id} in place of a path segment" else ""
             logger.log("$call -> $HTTP_NOT_FOUND, no mock found. Tried: $tried")
             val explanation = "No mock file found for $call. Tried: $tried"
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)

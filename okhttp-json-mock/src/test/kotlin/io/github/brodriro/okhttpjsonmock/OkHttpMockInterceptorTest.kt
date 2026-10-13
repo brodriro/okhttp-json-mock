@@ -223,7 +223,8 @@ class OkHttpMockInterceptorTest {
         assertContains(body, "api/v1/users/page=1.json")
         assertContains(body, "api/v1/users.json")
         assertContains(body, "api/v1/users.get.json")
-        assertEquals(4, provider.requestedPaths.size)
+        assertContains(body, "more with {id} in place of a path segment")
+        assertEquals(4, provider.requestedPaths.count { "{id}" !in it })
     }
 
     @Test
@@ -416,7 +417,8 @@ class OkHttpMockInterceptorTest {
         assertEquals(
             listOf(
                 "GET /api/v1/users?page=1 -> 200 from api/v1/users/page=1.json",
-                "GET /api/v1/unknown -> 404, no mock found. Tried: api/v1/unknown.get.json, api/v1/unknown.json",
+                "GET /api/v1/unknown -> 404, no mock found. Tried: api/v1/unknown.get.json, api/v1/unknown.json " +
+                    "and 12 more with {id} in place of a path segment",
             ),
             lines,
         )
@@ -736,5 +738,63 @@ class OkHttpMockInterceptorTest {
         const val USER = """{"id":1,"name":"John"}"""
         const val NUMBERS = """["0123456789"]"""
         const val USERS = "[\n  {\"id\":1},\n  {\"id\":2}\n]"
+    }
+
+    @Test
+    fun `id placeholder file answers any value of that segment`() {
+        val client = clientFor(FakeProvider(mapOf("api/v1/users/{id}.json" to USER)))
+
+        assertEquals(USER, client.get("http://example.com/api/v1/users/1").body!!.string())
+        assertEquals(USER, client.get("http://example.com/api/v1/users/42").body!!.string())
+    }
+
+    @Test
+    fun `id placeholder folder answers nested paths`() {
+        val provider = FakeProvider(mapOf("api/v1/users/{id}/phoneNumbers.json" to "[]"))
+
+        val response = clientFor(provider).get("http://example.com/api/v1/users/7/phoneNumbers")
+
+        assertEquals(200, response.code)
+        assertEquals("[]", response.body!!.string())
+    }
+
+    @Test
+    fun `file for the exact path wins over the id placeholder`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/users/{id}.get.json" to """{"id":0}""", "api/v1/users/search.json" to "[]"),
+        )
+        val client = clientFor(provider)
+
+        assertEquals("[]", client.get("http://example.com/api/v1/users/search").body!!.string())
+        assertEquals("""{"id":0}""", client.get("http://example.com/api/v1/users/9").body!!.string())
+    }
+
+    @Test
+    fun `id placeholder can be tied to a method and carry an envelope`() {
+        val provider = FakeProvider(
+            mapOf("api/v1/users/{id}.delete.json" to """{"statusCode":204}""", "api/v1/users/{id}.json" to USER),
+        )
+        val client = clientFor(provider)
+
+        val deleted = client.send("DELETE", "http://example.com/api/v1/users/5")
+
+        assertEquals(204, deleted.code)
+        assertEquals(USER, client.get("http://example.com/api/v1/users/5").body!!.string())
+    }
+
+    @Test
+    fun `two path segments can be placeholders`() {
+        val provider = FakeProvider(mapOf("orders/{id}/items/{id}.json" to USER))
+
+        assertEquals(USER, clientFor(provider).get("http://example.com/orders/3/items/8").body!!.string())
+    }
+
+    @Test
+    fun `a file for the exact path is found without asking for placeholder files`() {
+        val provider = FakeProvider(mapOf("api/v1/users/1.json" to USER))
+
+        clientFor(provider).get("http://example.com/api/v1/users/1")
+
+        assertEquals(0, provider.requestedPaths.count { "{id}" in it })
     }
 }
