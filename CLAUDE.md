@@ -11,6 +11,8 @@ A small JVM library that mocks HTTP responses for OkHttp/Retrofit: an OkHttp `In
 - `okhttp-json-mock/` — the library. Kotlin (`explicitApi`), Java 8 bytecode, language/API version 2.0 and `kotlin-stdlib` 2.0.21 on purpose (so consumers on Kotlin 1.9+ can read its metadata; do not use newer language features or stdlib APIs), published as `io.github.brodriro:okhttp-json-mock`.
 - `app/` — Android sample app in Kotlin (Retrofit suspend calls, coroutines, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...` and is also exercised by the library's `SampleMocksTest`. It needs no Kotlin plugin: AGP 9 compiles Kotlin on its own.
 
+- `consumer-test/` — standalone Gradle build, not included in the root project, that consumes the published artifact from `mavenLocal` from Kotlin and Java. CI runs it against several Kotlin versions.
+
 ## Commands
 
 Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions in `gradle/libs.versions.toml`. Needs JDK 17+ (21 is what is installed locally). `app` also needs an Android SDK (`ANDROID_HOME` or `local.properties`) with platform 36.
@@ -27,7 +29,7 @@ The library has JUnit 5 tests written in Kotlin under `okhttp-json-mock/src/test
 ```sh
 ./gradlew :okhttp-json-mock:test                                              # all library tests
 ./gradlew :okhttp-json-mock:test --tests 'io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptorTest'
-./gradlew build                                                             # compile + tests + ktlint + Android lint
+./gradlew build                                                             # compile + tests + ktlint + API check + Android lint
 ./gradlew ktlintFormat                                                      # fix code style violations
 ```
 
