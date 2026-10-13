@@ -1,3 +1,4 @@
+import io.github.brodriro.okhttpjsonmock.MissingMockException
 import io.github.brodriro.okhttpjsonmock.MockLogger
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
@@ -58,6 +59,17 @@ fun main() {
     failing.newCall(Request.Builder().url(url).build()).execute().use {
         check(it.code == 503, "simulated failure answers the configured code")
     }
+
+    val strict = OkHttpMockInterceptor.Builder(provider).noDelay().logger(MockLogger.NONE)
+        .failOnMissingMock().recordCalls().build()
+    val strictClient = OkHttpClient.Builder().addInterceptor(strict).build()
+    strictClient.newCall(Request.Builder().url(url).build()).execute().close()
+    val missing = runCatching { strictClient.newCall(Request.Builder().url("http://example.com/missing").build()).execute() }
+    check(missing.exceptionOrNull() is MissingMockException, "missing mock throws with failOnMissingMock")
+    check(
+        strict.recordedCalls.map { it.statusCode } == listOf(200, null) && strict.recordedCalls[0].mockFile == "api/v1/users.json",
+        "calls are recorded with file and status",
+    )
 
     JavaConsumer.run().forEach { (what, ok) -> check(ok, "Java: $what") }
 
