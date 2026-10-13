@@ -59,6 +59,8 @@ Before a release, publish to `mavenLocal` and build an outside project against i
 
 The method suffix is the HTTP method in lower case (`.get`, `.post`, `.put`, `.delete`, `.patch`, …). Files without it answer every method, which keeps 3.0 mocks working and is how one URL gets a different mock per method.
 
+When none of those exists, the same names are tried with `{id}` in place of a path segment (`api/v1/{id}.get.json`, `api/{id}/users.get.json`, …): one segment at a time starting from the last, then two at a time, never more than two. A file or folder literally named `{id}` therefore answers any value of that segment (`users/{id}.json`, `users/{id}/posts.json`), and a file for the exact path always wins. `basePath` is never replaced. Braces cannot clash with a real path because OkHttp percent-encodes them in URLs, and aapt packages `{id}` assets with its default settings (a leading underscore would be ignored for folders).
+
 With several query parameters the exact string is tried first (`page=1&categoryId=5`) and then the same parameters sorted (`categoryId=5&page=1`), in both the method and the shared group. `basePath` is prepended to every candidate. Leading and trailing slashes are trimmed, and the root path `/` is looked up as `index`.
 
 A mock is answered as it is with status 200. To answer with another status the file wraps the response in an envelope read by `MockEnvelope` with Gson: `{ "statusCode": 201, "response": { ... } }` answers 201 with the `response` value as the body, and `{ "statusCode": 204 }` answers with no body. An optional `"headers": { "Location": "/users/4" }` object adds response headers (values may be strings, numbers or booleans; `Content-Type` replaces the default). A file is an envelope only when it is an object that has `statusCode` and no keys other than `statusCode`, `headers` and `response`; everything else, including a real payload with a `statusCode` field plus other keys, is served untouched. An envelope whose `statusCode` is not an HTTP status, or whose `headers` is not an object of valid names and simple values, fails the call with an `IOException` naming the file.
@@ -68,10 +70,10 @@ Each candidate is handed to an `InputStreamProvider`, the single extension point
 Behaviours that are easy to miss:
 
 - Host, headers and request body are ignored; only method, path and query select the file.
-- Every miss costs one provider call, so a request can make up to six lookups. Providers must return `null` quietly for a missing file.
-- A provider is asked for the method files before the shared ones. A provider with its own fallback (for example a generic `_id.json` for any id) must not mistake the method suffix for a path segment; this broke a real app during migration and is called out in the README migration guide.
+- Every miss costs one provider call. A request whose exact file exists makes at most six lookups; a request answered by an `{id}` file, or by nothing, makes a few dozen (two to six per path variant, with `1 + n + n(n-1)/2` variants for `n` segments). Providers must return `null` quietly and cheaply for a missing file.
+- A provider is asked for the method files before the shared ones. A provider with its own fallback (for example a generic `_id.json` for any id) must not mistake the method suffix for a path segment (the built-in `{id}` files make such providers unnecessary); this broke a real app during migration and is called out in the README migration guide.
 - The real network is never hit: `chain.proceed` is not called.
-- No matching file → 404 with a `text/plain` body listing the files that were tried. This wins over the simulated failure.
+- No matching file → 404 with a `text/plain` body listing the exact-path files that were tried and counting the `{id}` ones. This wins over the simulated failure.
 - `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
 - Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms); equal bounds give a fixed delay. An interrupt during the sleep throws `InterruptedIOException`.
 - A plain mock is returned byte for byte as `application/json`; an envelope's `response` is re-serialised by Gson (compact, nulls and number text preserved). The status line carries the standard reason phrase.
