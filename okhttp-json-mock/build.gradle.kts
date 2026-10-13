@@ -19,6 +19,9 @@ java {
 
 kotlin {
     explicitApi()
+    // Fails the build when the public API changes without the dump in api/ being updated.
+    @OptIn(org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation::class)
+    abiValidation()
     // Language, API and standard library stay on an older Kotlin so that projects
     // with an older compiler can still read the published metadata.
     coreLibrariesVersion = "2.0.21"

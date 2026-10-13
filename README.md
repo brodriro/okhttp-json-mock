@@ -286,8 +286,9 @@ Behaviour that changed:
 
 Contributions are welcome. Branch from `develop` and open a pull request against `develop`.
 
-Run `./gradlew build` before opening it: it runs the tests, ktlint and Android lint, the same checks
-as the CI. `./gradlew ktlintFormat` fixes most style problems.
+Run `./gradlew build` before opening it: it runs the tests, ktlint, Android lint and the public API
+check, the same checks as the CI. `./gradlew ktlintFormat` fixes most style problems. If you change
+the public API on purpose, run `./gradlew :okhttp-json-mock:updateKotlinAbi` and commit the result.
 
 ## License
 
