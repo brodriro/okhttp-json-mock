@@ -8,7 +8,7 @@ A small JVM library that mocks HTTP responses for OkHttp/Retrofit: an OkHttp `In
 
 ## Modules
 
-- `okhttp-json-mock/` — the library. Kotlin (`explicitApi`), Java 8 bytecode, published as `io.github.brodriro:okhttp-json-mock`.
+- `okhttp-json-mock/` — the library. Kotlin (`explicitApi`), Java 8 bytecode, language/API version 2.0 and `kotlin-stdlib` 2.0.21 on purpose (so consumers on Kotlin 1.9+ can read its metadata; do not use newer language features or stdlib APIs), published as `io.github.brodriro:okhttp-json-mock`.
 - `app/` — Android sample app in Kotlin (Retrofit suspend calls, coroutines, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...` and is also exercised by the library's `SampleMocksTest`. It needs no Kotlin plugin: AGP 9 compiles Kotlin on its own.
 
 ## Commands
