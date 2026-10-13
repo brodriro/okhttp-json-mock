@@ -31,6 +31,12 @@ dependencies {
 }
 ```
 
+Requirements:
+
+- Java 8 or newer. On Android, API 21 or newer, which is what OkHttp supports.
+- OkHttp 4.12 or newer, including 5.x.
+- In Kotlin projects, Kotlin 1.9 or newer. Java projects need nothing else.
+
 ## Quick start
 
 Tell the interceptor where your mock files are, then add it to your client.
@@ -71,6 +77,13 @@ InputStreamProvider assets = path -> {
 OkHttpClient client = new OkHttpClient.Builder()
     .addInterceptor(new OkHttpMockInterceptor.Builder(assets).build())
     .build();
+```
+
+The interceptor answers **every** request of the client it is added to, so add it only where you want
+mocks, typically in debug builds:
+
+```kotlin
+if (BuildConfig.DEBUG) builder.addInterceptor(OkHttpMockInterceptor.Builder(assets).build())
 ```
 
 On a plain JVM project, `OkHttpMockInterceptor.Builder()` without arguments reads the files from the
@@ -221,6 +234,9 @@ The interceptor answers `404` with a plain-text body that lists the files it loo
 No mock file found for GET /api/v1/unknown. Tried: api/v1/unknown.get.json, api/v1/unknown.json and 12 more with {id} in place of a path segment
 ```
 
+The same text goes to the log. In tests you can make this an exception instead: see
+[Using it in tests](#using-it-in-tests).
+
 ## Using it in tests
 
 Two options make the interceptor stricter, which is what a test usually wants:
@@ -276,7 +292,6 @@ api/v1/
 2. Change the imports from `ir.mirrajabi.okhttpjsonmock` to `io.github.brodriro.okhttpjsonmock`.
 3. If you called the setters (`setBasePath`, `setFailurePercentage`, ...), use `OkHttpMockInterceptor.Builder`
    instead. Instances are now immutable.
-
 4. In Kotlin, a provider written as `object : InputStreamProvider` must declare the parameter as
    non-null: `override fun provide(path: String): InputStream?`. It can also become a lambda:
    `InputStreamProvider { path -> ... }`.
@@ -294,10 +309,11 @@ If the fallback only exists to answer any id, drop it and name the file `{id}.js
 
 Behaviour that changed:
 
-- A request without a mock answers `404` instead of throwing `IllegalStateException`.
+- A request without a mock answers `404` instead of throwing `IllegalStateException`. If you relied
+  on the exception, build the interceptor with `failOnMissingMock()`.
 - A simulated failure has an empty body instead of the contents of the mock.
 - `ResourcesHelper` was removed.
-- OkHttp 4.12 is required.
+- OkHttp 4.12 or newer is required, and Kotlin projects need Kotlin 1.9 or newer.
 
 ## Changelog
 
