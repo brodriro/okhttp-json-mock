@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
     `java-library`
@@ -18,8 +19,13 @@ java {
 
 kotlin {
     explicitApi()
+    // Language, API and standard library stay on an older Kotlin so that projects
+    // with an older compiler can still read the published metadata.
+    coreLibrariesVersion = "2.0.21"
     compilerOptions {
         jvmTarget = JvmTarget.JVM_1_8
+        languageVersion = KotlinVersion.KOTLIN_2_0
+        apiVersion = KotlinVersion.KOTLIN_2_0
     }
 }
 
