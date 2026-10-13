@@ -14,5 +14,6 @@ Changes made in this fork since version 3.0:
   the headers of the response.
 - A mock file or folder named {id} answers any value of that path segment.
 - A request without a mock is answered with a 404 instead of an exception.
-- Interceptors are immutable and are configured through a builder.
+- Interceptors are immutable and are configured through a builder, which can
+  also make a missing mock fail and record the calls received, for tests.
 - The sample application was rewritten in Kotlin.

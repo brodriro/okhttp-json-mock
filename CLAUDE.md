@@ -78,11 +78,12 @@ Behaviours that are easy to miss:
 - A provider is asked for the method files before the shared ones. A provider with its own fallback (for example a generic `_id.json` for any id) must not mistake the method suffix for a path segment (the built-in `{id}` files make such providers unnecessary); this broke a real app during migration and is called out in the README migration guide.
 - The real network is never hit: `chain.proceed` is not called.
 - No matching file → 404 with a `text/plain` body listing the exact-path files that were tried and counting the `{id}` ones. This wins over the simulated failure.
+- `Builder.failOnMissingMock()` replaces that 404 with a `MissingMockException` (an `IOException`, so asynchronous calls get it in `onFailure`). `Builder.recordCalls()` keeps each request as a `RecordedCall` (method, url, mock file, status; status is `null` when the call failed for a missing mock) in `recordedCalls`, a snapshot guarded by a lock; `clearRecordedCalls()` empties it. Both are off by default and unavailable through the 3.0 constructors.
 - `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
 - Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms); equal bounds give a fixed delay. An interrupt during the sleep throws `InterruptedIOException`.
 - A plain mock is returned byte for byte as `application/json`; an envelope's `response` is re-serialised by Gson (compact, nulls and number text preserved). The status line carries the standard reason phrase.
 - Gson is an `implementation` dependency used only by `MockEnvelope`; files that do not contain the text `statusCode` are never parsed.
-- Instances are immutable. They are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
+- The configuration is immutable; the only mutable state is the list of recorded calls. Instances are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
 - Each call logs one line through `MockLogger` (`STDOUT` by default, `NONE` to silence).
 - Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`) throws `IllegalArgumentException` at construction.
 
