@@ -42,7 +42,8 @@ First release of the fork. See [Migrating from 3.0](README.md#migrating-from-30)
 
 - Equal minimum and maximum delays no longer fail with a division by zero, and inverted delays are
   rejected when the interceptor is created.
-- The status line carries the standard reason phrase, and responses are HTTP/1.1.
+- The status line carries the standard reason phrase of every registered status code (RFC 9110 names,
+  plus 418), or the name of its class for any other code, and responses are HTTP/1.1.
 - A failure percentage outside 0 to 100 is rejected.
 - An interrupt during the simulated delay fails the call with `InterruptedIOException` and keeps the
   thread's interrupted flag.

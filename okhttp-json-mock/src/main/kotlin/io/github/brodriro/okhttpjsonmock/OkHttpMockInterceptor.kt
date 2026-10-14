@@ -189,32 +189,13 @@ public class OkHttpMockInterceptor private constructor(
     ): Response {
         val builder = Response.Builder()
             .code(code)
-            .message(reasonPhrase(code))
+            .message(ReasonPhrases.of(code))
             .request(request)
             .protocol(Protocol.HTTP_1_1)
             .body(body.toResponseBody(contentType.toMediaTypeOrNull()))
             .addHeader("content-type", contentType)
         headers.forEach { (name, value) -> builder.addHeader(name, value) }
         return builder.build()
-    }
-
-    private fun reasonPhrase(code: Int): String = when (code) {
-        200 -> "OK"
-        201 -> "Created"
-        202 -> "Accepted"
-        204 -> "No Content"
-        400 -> "Bad Request"
-        401 -> "Unauthorized"
-        403 -> "Forbidden"
-        404 -> "Not Found"
-        409 -> "Conflict"
-        422 -> "Unprocessable Entity"
-        429 -> "Too Many Requests"
-        500 -> "Internal Server Error"
-        502 -> "Bad Gateway"
-        503 -> "Service Unavailable"
-        504 -> "Gateway Timeout"
-        else -> "Mock Response"
     }
 
     /** A latency in `[min, max)`, or exactly `min` when both bounds are equal. */
