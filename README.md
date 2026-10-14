@@ -201,8 +201,9 @@ an array, and can be left out for a response with no body:
 | `statusCode` | yes | HTTP status code, from 100 to 599. |
 | `response` | no | The body: an object, an array or any JSON value. No body when missing. |
 | `headers` | no | Response headers. Values can be strings, numbers or booleans. `Content-Type` replaces the default `application/json`. |
+| `delayMs` | no | Latency of this mock in milliseconds, from 0 up. Replaces the [delay of the interceptor](#options) for this file, so one slow endpoint can be simulated, or one made instant. |
 
-A file is only read as a wrapper when it has `statusCode` and no keys other than these three. A real
+A file is only read as a wrapper when it has `statusCode` and no keys other than these four. A real
 payload such as `{ "statusCode": 404, "message": "Not found" }` has another key, so it is returned as
 it is.
 
@@ -321,12 +322,12 @@ GET /api/v1/users/search -> 200 from api/v1/users/{id}.json
   mock is chosen.
 
 **The body arrives wrapped, or the status is always 200.** A file is only read as a wrapper when it
-is an object with `statusCode` and no keys other than `statusCode`, `headers` and `response`. With
+is an object with `statusCode` and no keys other than `statusCode`, `headers`, `delayMs` and `response`. With
 any other key, such as `{ "statusCode": 404, "message": "..." }`, the file is the body itself.
 
 **A call fails with an `IOException` that names a mock file.** The wrapper in that file has a
-`statusCode` that is not a number from 100 to 599, or `headers` that is not an object of simple
-values.
+`statusCode` that is not a number from 100 to 599, `headers` that is not an object of simple
+values, or a `delayMs` that is not a whole number from 0 up.
 
 **Calls are slow.** Every call waits between 500 and 1500 ms by default to imitate a network. Use
 `delay(min, max)` to change it or `noDelay()` to remove it.

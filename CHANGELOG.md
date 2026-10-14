@@ -16,6 +16,8 @@ First release of the fork. See [Migrating from 3.0](README.md#migrating-from-30)
   A file without a method answers every method.
 - Status code and headers per mock, written in the mock file:
   `{ "statusCode": 201, "headers": { ... }, "response": { ... } }`.
+- Latency per mock with `delayMs` in the same wrapper, which replaces the delay of the interceptor for
+  that file.
 - `{id}` files and folders that answer any value of a path segment, such as `users/{id}.json`.
 - `OkHttpMockInterceptor.Builder`, with `basePath`, `delay`, `noDelay`, `failurePercentage`,
   `failureCode` and `logger`.
