@@ -677,6 +677,41 @@ class OkHttpMockInterceptorTest {
     }
 
     @Test
+    fun `envelope delay replaces the latency of the interceptor`() {
+        val provider = FakeProvider(
+            mapOf(
+                "api/v1/fast.json" to """{"statusCode":200,"delayMs":0,"response":{"id":1}}""",
+                "api/v1/slow.json" to """{"statusCode":200,"delayMs":300,"response":{"id":2}}""",
+            ),
+        )
+        val slowByDefault = OkHttpClient.Builder()
+            .addInterceptor(OkHttpMockInterceptor.Builder(provider).delay(5_000, 5_000).logger(MockLogger.NONE).build())
+            .build()
+        val fastByDefault = OkHttpClient.Builder()
+            .addInterceptor(OkHttpMockInterceptor.Builder(provider).noDelay().logger(MockLogger.NONE).build())
+            .build()
+
+        val fastStart = System.nanoTime()
+        assertEquals(200, slowByDefault.get("http://example.com/api/v1/fast").code)
+        val fastMillis = (System.nanoTime() - fastStart) / 1_000_000
+        val slowStart = System.nanoTime()
+        assertEquals(200, fastByDefault.get("http://example.com/api/v1/slow").code)
+        val slowMillis = (System.nanoTime() - slowStart) / 1_000_000
+
+        assertTrue(fastMillis < 2_000, "delayMs 0 took $fastMillis ms")
+        assertTrue(slowMillis >= 300, "delayMs 300 took $slowMillis ms")
+    }
+
+    @Test
+    fun `envelope with an invalid delay fails the call naming the file`() {
+        val provider = FakeProvider(mapOf("api/v1/users.json" to """{"statusCode":200,"delayMs":-5}"""))
+
+        val error = assertFailsWith<IOException> { clientFor(provider).get("http://example.com/api/v1/users") }
+
+        assertContains(error.message!!, "api/v1/users.json")
+    }
+
+    @Test
     fun `plain mock can be a json object or a json array`() {
         val provider = FakeProvider(
             mapOf(

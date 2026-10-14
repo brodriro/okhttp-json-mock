@@ -23,9 +23,10 @@ import kotlin.random.Random
  * A mock is answered as it is with status 200. To answer with another status, wrap it:
  * `{ "statusCode": 201, "response": { "id": 4 } }` answers 201 with `{"id":4}` as the body, and
  * `{ "statusCode": 204 }` answers 204 with no body. The wrapper can also carry response headers
- * in an optional `"headers": { "Location": "/users/4" }` object. A file is only treated as a
- * wrapper when it has `statusCode` and no keys other than `statusCode`, `headers` and `response`,
- * so real payloads that happen to have a `statusCode` field are left alone.
+ * in an optional `"headers": { "Location": "/users/4" }` object, and an optional `"delayMs": 2000`
+ * replaces the simulated latency for that mock. A file is only treated as a wrapper when it has
+ * `statusCode` and no keys other than `statusCode`, `headers`, `delayMs` and `response`, so real
+ * payloads that happen to have a `statusCode` field are left alone.
  * A file or folder named `{id}` matches any value of a path segment, so `users/{id}.json` answers
  * `/users/1` and `/users/42` when there is no file for that exact path.
  * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
@@ -131,8 +132,9 @@ public class OkHttpMockInterceptor private constructor(
         val request = chain.request()
         val candidates = resolver.candidates(request.method, request.url)
         val match = candidates.firstNotNullOfOrNull { path -> readMock(path)?.let { path to it } }
+        val envelope = match?.let { (path, mock) -> MockEnvelope.parseOrNull(mock, path) }
         try {
-            Thread.sleep(nextDelayMilliseconds())
+            Thread.sleep(envelope?.delayMilliseconds?.toLong() ?: nextDelayMilliseconds())
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
             throw InterruptedIOException("Interrupted while simulating the network delay").apply { initCause(e) }
@@ -154,7 +156,6 @@ public class OkHttpMockInterceptor private constructor(
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
         val (path, mock) = match
-        val envelope = MockEnvelope.parseOrNull(mock, path)
         if (Random.nextInt(100) < failurePercentage) {
             logger.log("$call -> $failureCode, simulated failure")
             record(request, path, failureCode)

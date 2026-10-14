@@ -15,6 +15,7 @@ import java.io.IOException
  * {
  *   "statusCode": 201,
  *   "headers": { "Location": "/api/v1/users/4" },
+ *   "delayMs": 2000,
  *   "response": { "id": 4, "name": "Ana" }
  * }
  * ```
@@ -23,31 +24,36 @@ import java.io.IOException
  * @property body the `response` value serialised as JSON, or nothing when the file has no `response`.
  * @property contentType the `Content-Type` given in `headers`, or `null` to keep the default.
  * @property headers every other entry of `headers`, in file order. Empty when the file has none.
+ * @property delayMilliseconds the `delayMs` value, which replaces the interceptor's latency for this
+ * mock, or `null` to keep it.
  */
 internal class MockEnvelope(
     val statusCode: Int,
     val body: ByteArray,
     val contentType: String?,
     val headers: List<Pair<String, String>>,
+    val delayMilliseconds: Int?,
 ) {
     companion object {
         private const val STATUS_KEY = "statusCode"
         private const val HEADERS_KEY = "headers"
         private const val RESPONSE_KEY = "response"
+        private const val DELAY_KEY = "delayMs"
         private const val CONTENT_TYPE = "Content-Type"
-        private val ENVELOPE_KEYS = setOf(STATUS_KEY, HEADERS_KEY, RESPONSE_KEY)
+        private val ENVELOPE_KEYS = setOf(STATUS_KEY, HEADERS_KEY, DELAY_KEY, RESPONSE_KEY)
         private val gson = GsonBuilder().serializeNulls().disableHtmlEscaping().create()
 
         /**
          * Reads [mock] as an envelope, or returns `null` when it is a plain mock to be served as it is.
          *
          * A file is an envelope only when it is a JSON object that has `statusCode` and no keys
-         * other than `statusCode`, `headers` and `response`. Anything else, including files that
-         * are not valid JSON, is a plain mock.
+         * other than `statusCode`, `headers`, `delayMs` and `response`. Anything else, including
+         * files that are not valid JSON, is a plain mock.
          *
          * @param source name of the file, used in error messages.
          * @throws IOException when the file is an envelope but its `statusCode` is not an HTTP
-         * status code or its `headers` is not an object of valid header names and values.
+         * status code, its `headers` is not an object of valid header names and values or its
+         * `delayMs` is not a whole number of milliseconds from 0 up.
          */
         fun parseOrNull(mock: ByteArray, source: String): MockEnvelope? {
             val text = mock.decodeToString()
@@ -67,6 +73,7 @@ internal class MockEnvelope(
                 body = body,
                 contentType = headers.lastOrNull { (name, _) -> name.equals(CONTENT_TYPE, ignoreCase = true) }?.second,
                 headers = headers.filterNot { (name, _) -> name.equals(CONTENT_TYPE, ignoreCase = true) },
+                delayMilliseconds = root.get(DELAY_KEY)?.let { delayOf(it, source) },
             )
         }
 
@@ -86,6 +93,16 @@ internal class MockEnvelope(
                 }
                 name to text
             }
+        }
+
+        private fun delayOf(value: JsonElement, source: String): Int {
+            val delay = value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }
+                ?.asString
+                ?.toIntOrNull()
+            return delay?.takeIf { it >= 0 }
+                ?: throw IOException(
+                    "$source: delayMs must be a whole number of milliseconds from 0 up but was $value",
+                )
         }
 
         private fun statusCodeOf(value: JsonElement, source: String): Int {

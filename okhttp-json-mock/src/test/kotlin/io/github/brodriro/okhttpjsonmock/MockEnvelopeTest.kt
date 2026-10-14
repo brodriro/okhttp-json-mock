@@ -97,6 +97,23 @@ class MockEnvelopeTest {
     }
 
     @Test
+    fun `delay is read and is optional`() {
+        assertEquals(2000, parse("""{"statusCode":200,"delayMs":2000,"response":{"id":1}}""")!!.delayMilliseconds)
+        assertEquals(0, parse("""{"statusCode":204,"delayMs":0}""")!!.delayMilliseconds)
+        assertNull(parse("""{"statusCode":200,"response":{"id":1}}""")!!.delayMilliseconds)
+    }
+
+    @Test
+    fun `delay that is not a whole number of milliseconds is rejected naming the file`() {
+        val error = assertFailsWith<IOException> { parse("""{"statusCode":200,"delayMs":"slow"}""") }
+
+        assertContains(error.message!!, "users.post.json")
+        assertFailsWith<IOException> { parse("""{"statusCode":200,"delayMs":-1}""") }
+        assertFailsWith<IOException> { parse("""{"statusCode":200,"delayMs":1.5}""") }
+        assertFailsWith<IOException> { parse("""{"statusCode":200,"delayMs":null}""") }
+    }
+
+    @Test
     fun `plain mocks are not envelopes`() {
         assertNull(parse("""{"id":1,"name":"John"}"""))
         assertNull(parse("""[{"id":1},{"id":2}]"""))
