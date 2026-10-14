@@ -58,8 +58,9 @@ freeline_project_description.json
 # Kotlin
 .kotlin/
 
-# Claude Code local rules
+# Claude Code local rules and settings
 .claude/rules/
+.claude/settings.local.json
 
 # Internal planning notes
 docs/
