@@ -33,6 +33,9 @@ import kotlin.random.Random
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
  *
+ * Every call waits before it is answered, to imitate a network: a random time between 500 and
+ * 1500 ms unless another window is given. Use [Builder.noDelay] in tests.
+ *
  * For tests, [Builder.failOnMissingMock] turns a missing mock into a [MissingMockException] and
  * [Builder.recordCalls] keeps the requests that were received in [recordedCalls].
  *
@@ -102,10 +105,10 @@ public class OkHttpMockInterceptor private constructor(
         recordCalls = false,
     )
 
-    /** Reads mocks from the filesystem with the default latency. */
+    /** Reads mocks from the filesystem with the default latency of 500 to 1500 ms. */
     public constructor(failurePercentage: Int) : this(DefaultInputStreamProvider(), failurePercentage)
 
-    /** Reads mocks from [inputStreamProvider] with the default latency. */
+    /** Reads mocks from [inputStreamProvider] with the default latency of 500 to 1500 ms. */
     public constructor(inputStreamProvider: InputStreamProvider, failurePercentage: Int) : this(
         inputStreamProvider,
         failurePercentage,
@@ -241,13 +244,16 @@ public class OkHttpMockInterceptor private constructor(
         /** Prefix added to every resolved file path, for example `mocks/`. */
         public fun basePath(basePath: String): Builder = apply { this.basePath = basePath }
 
-        /** Simulated latency in `[minMilliseconds, maxMilliseconds)`. Equal bounds give a fixed latency. */
+        /**
+         * Simulated latency in `[minMilliseconds, maxMilliseconds)`. Equal bounds give a fixed latency.
+         * Between 500 and 1500 ms when not set.
+         */
         public fun delay(minMilliseconds: Int, maxMilliseconds: Int): Builder = apply {
             minDelayMilliseconds = minMilliseconds
             maxDelayMilliseconds = maxMilliseconds
         }
 
-        /** Answers immediately. Useful in tests. */
+        /** Answers immediately instead of waiting 500 to 1500 ms. Useful in tests. */
         public fun noDelay(): Builder = delay(0, 0)
 
         /**
