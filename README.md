@@ -288,6 +288,52 @@ api/v1/
         └── phoneNumbers.json  GET /api/v1/users/1/phoneNumbers
 ```
 
+## Troubleshooting
+
+**A request answers 404.** The response body and the log line say which files were looked for:
+
+```
+GET /api/v1/users/7 -> 404, no mock found. Tried: api/v1/users/7.get.json, api/v1/users/7.json and 20 more with {id} in place of a path segment
+```
+
+Compare those names with the files you have. The usual causes:
+
+- The file is not where the URL says. The path of the file is the path of the URL, including any
+  prefix such as `api/v1`, plus the `basePath` you configured.
+- The base URL of the client adds a segment you did not count on. With a base URL of
+  `https://example.com/mocks/`, a call to `users` is looked up as `mocks/users.json`.
+- The file has a method suffix for another method: `users.post.json` does not answer a `GET`.
+- On Android the file is outside `src/main/assets`, or in the `assets` of a build type that is not
+  the one you are running.
+
+**The wrong mock answers.** The log line names the file that was used:
+
+```
+GET /api/v1/users/search -> 200 from api/v1/users/{id}.json
+```
+
+- An `{id}` file answers every path that has no file of its own. Add a file for the exact path,
+  here `users/search.json`, and it takes precedence.
+- A file with a method suffix wins over one without it, and a file for a query wins over the file
+  for the path. See [the order](#one-url-different-http-methods).
+- If you wrote your own `InputStreamProvider`, check that it opens exactly the file it is asked for
+  and returns `null` for anything else. A provider that falls back to another file changes which
+  mock is chosen.
+
+**The body arrives wrapped, or the status is always 200.** A file is only read as a wrapper when it
+is an object with `statusCode` and no keys other than `statusCode`, `headers` and `response`. With
+any other key, such as `{ "statusCode": 404, "message": "..." }`, the file is the body itself.
+
+**A call fails with an `IOException` that names a mock file.** The wrapper in that file has a
+`statusCode` that is not a number from 100 to 599, or `headers` that is not an object of simple
+values.
+
+**Calls are slow.** Every call waits between 500 and 1500 ms by default to imitate a network. Use
+`delay(min, max)` to change it or `noDelay()` to remove it.
+
+**A test passes although a mock is missing.** By default a missing mock is a 404, which your code
+may handle like any server error. Build the interceptor with `failOnMissingMock()` in tests.
+
 ## Migrating from 3.0
 
 1. Change the dependency to `io.github.brodriro:okhttp-json-mock:4.0.0`.
