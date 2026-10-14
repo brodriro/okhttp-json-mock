@@ -365,23 +365,12 @@ Behaviour that changed:
 
 ## Changelog
 
-4.0.0 - `Kotlin, mocks per HTTP method, status code and headers per mock, {id} paths, 404 for missing mocks, Builder, options for tests`
-
-3.0 - `Removed wrapper for mocked responses`
-
-2.0 - `The library no longer depends on android classes`
-
-1.1.1 - `Fixes file name lowercase issue`
-
-1.1 - `Adds delay customization option.`
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
-Contributions are welcome. Branch from `develop` and open a pull request against `develop`.
-
-Run `./gradlew build` before opening it: it runs the tests, ktlint, Android lint, the public API
-check and the coverage check, the same checks as the CI. `./gradlew ktlintFormat` fixes most style problems. If you change
-the public API on purpose, run `./gradlew :okhttp-json-mock:updateKotlinAbi` and commit the result.
+Contributions are welcome. Branch from `develop`, run `./gradlew build` and open a pull request
+against `develop`. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
 
 ## License
 
