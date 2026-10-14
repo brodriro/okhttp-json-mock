@@ -91,6 +91,11 @@ if (BuildConfig.DEBUG) builder.addInterceptor(OkHttpMockInterceptor.Builder(asse
 On a plain JVM project, `OkHttpMockInterceptor.Builder()` without arguments reads the files from the
 filesystem, relative to the working directory.
 
+Every call waits a random time between 500 and 1500 ms before it is answered, to imitate a network,
+so loading states and spinners show up as they would against a real server. Use `delay(min, max)` to
+change the window, `delay(300, 300)` for a fixed wait, or `noDelay()` to answer at once, which is what
+tests usually want (see [Options](#options)).
+
 The provider must return `null` when the file does not exist. The interceptor asks for several files per
 request and most of them will not be there.
 
@@ -245,7 +250,7 @@ Two options make the interceptor stricter, which is what a test usually wants:
 
 ```kotlin
 val interceptor = OkHttpMockInterceptor.Builder(provider)
-    .noDelay()
+    .noDelay()             // otherwise every call waits 500 to 1500 ms
     .failOnMissingMock()   // a request without a mock throws instead of answering 404
     .recordCalls()         // keep the requests that were received
     .build()
@@ -345,7 +350,7 @@ may handle like any server error. Build the interceptor with `failOnMissingMock(
    `InputStreamProvider { path -> ... }`.
 
 The constructors of 3.0, such as `new OkHttpMockInterceptor(provider, 5)`, and your existing mock files
-keep working.
+keep working. The default delay is still 500 to 1500 ms per call.
 
 If your provider does more than open the file it is asked for, check it. For each request it is now
 asked for the method files first (`users/1.get.json`) and then for the shared ones (`users/1.json`).
