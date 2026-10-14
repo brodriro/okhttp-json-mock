@@ -15,3 +15,6 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# Gson fills the sample models by reflection, so their fields must keep their names.
+-keep class io.github.brodriro.okhttpjsonmock.sample.models.** { *; }
