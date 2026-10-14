@@ -37,6 +37,8 @@ Requirements:
 - OkHttp 4.12 or newer, including 5.x.
 - In Kotlin projects, Kotlin 1.9 or newer. Java projects need nothing else.
 
+The API reference of the latest release is at <https://brodriro.github.io/okhttp-json-mock/>.
+
 ## Quick start
 
 Tell the interceptor where your mock files are, then add it to your client.
@@ -331,8 +333,8 @@ Behaviour that changed:
 
 Contributions are welcome. Branch from `develop` and open a pull request against `develop`.
 
-Run `./gradlew build` before opening it: it runs the tests, ktlint, Android lint and the public API
-check, the same checks as the CI. `./gradlew ktlintFormat` fixes most style problems. If you change
+Run `./gradlew build` before opening it: it runs the tests, ktlint, Android lint, the public API
+check and the coverage check, the same checks as the CI. `./gradlew ktlintFormat` fixes most style problems. If you change
 the public API on purpose, run `./gradlew :okhttp-json-mock:updateKotlinAbi` and commit the result.
 
 ## License
