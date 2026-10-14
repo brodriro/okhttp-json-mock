@@ -32,8 +32,11 @@ import kotlin.random.Random
  * The file is returned byte for byte and is expected to be UTF-8.
  * When no file matches, the answer is a 404 whose body lists the files that were tried.
  *
- * Instances are immutable and safe to share between threads. Create them with [Builder] or with one
- * of the constructors kept from 3.0.
+ * For tests, [Builder.failOnMissingMock] turns a missing mock into a [MissingMockException] and
+ * [Builder.recordCalls] keeps the requests that were received in [recordedCalls].
+ *
+ * The configuration is immutable and instances are safe to share between threads. Create them with
+ * [Builder] or with one of the constructors kept from 3.0.
  *
  * @param inputStreamProvider where mock files are read from.
  * @property failurePercentage chance, from 0 to 100, of answering with [failureCode] and an empty body.
@@ -50,9 +53,24 @@ public class OkHttpMockInterceptor private constructor(
     public val maxDelayMilliseconds: Int,
     public val failureCode: Int,
     private val logger: MockLogger,
+    private val failOnMissingMock: Boolean,
+    private val recordCalls: Boolean,
 ) : Interceptor {
 
     private val resolver = MockFileResolver(basePath)
+    private val calls = mutableListOf<RecordedCall>()
+
+    /**
+     * The requests received so far, oldest first. Always empty unless the interceptor was built
+     * with [Builder.recordCalls]. The list is a snapshot: later calls do not change it.
+     */
+    public val recordedCalls: List<RecordedCall>
+        get() = synchronized(calls) { calls.toList() }
+
+    /** Forgets the requests recorded so far, for example between two tests. */
+    public fun clearRecordedCalls() {
+        synchronized(calls) { calls.clear() }
+    }
 
     init {
         require(failureCode in 400..599) { "failureCode must be a 4xx or 5xx status: $failureCode" }
@@ -79,6 +97,8 @@ public class OkHttpMockInterceptor private constructor(
         maxDelayMilliseconds,
         DEFAULT_FAILURE_CODE,
         MockLogger.STDOUT,
+        failOnMissingMock = false,
+        recordCalls = false,
     )
 
     /** Reads mocks from the filesystem with the default latency. */
@@ -123,18 +143,26 @@ public class OkHttpMockInterceptor private constructor(
             val withPlaceholder = candidates.size - exact.size
             val tried = exact.joinToString() +
                 if (withPlaceholder > 0) " and $withPlaceholder more with {id} in place of a path segment" else ""
-            logger.log("$call -> $HTTP_NOT_FOUND, no mock found. Tried: $tried")
             val explanation = "No mock file found for $call. Tried: $tried"
+            if (failOnMissingMock) {
+                logger.log("$call -> failed, no mock found. Tried: $tried")
+                record(request, mockFile = null, statusCode = null)
+                throw MissingMockException(request.method, request.url, candidates, explanation)
+            }
+            logger.log("$call -> $HTTP_NOT_FOUND, no mock found. Tried: $tried")
+            record(request, mockFile = null, statusCode = HTTP_NOT_FOUND)
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
         val (path, mock) = match
         val envelope = MockEnvelope.parseOrNull(mock, path)
         if (Random.nextInt(100) < failurePercentage) {
             logger.log("$call -> $failureCode, simulated failure")
+            record(request, path, failureCode)
             return response(request, failureCode, ByteArray(0), CONTENT_TYPE_JSON)
         }
         val statusCode = envelope?.statusCode ?: HTTP_OK
         logger.log("$call -> $statusCode from $path")
+        record(request, path, statusCode)
         return response(
             request,
             statusCode,
@@ -142,6 +170,11 @@ public class OkHttpMockInterceptor private constructor(
             envelope?.contentType ?: CONTENT_TYPE_JSON,
             envelope?.headers.orEmpty(),
         )
+    }
+
+    private fun record(request: Request, mockFile: String?, statusCode: Int?) {
+        if (!recordCalls) return
+        synchronized(calls) { calls += RecordedCall(request.method, request.url, mockFile, statusCode) }
     }
 
     /** The raw bytes of the mock at [path], or `null` when the provider has no such file. */
@@ -206,6 +239,8 @@ public class OkHttpMockInterceptor private constructor(
         private var maxDelayMilliseconds = DELAY_DEFAULT_MAX
         private var failureCode = DEFAULT_FAILURE_CODE
         private var logger = MockLogger.STDOUT
+        private var failOnMissingMock = false
+        private var recordCalls = false
 
         /** Reads mocks from the filesystem. */
         public constructor() : this(DefaultInputStreamProvider())
@@ -233,6 +268,18 @@ public class OkHttpMockInterceptor private constructor(
         /** Answers immediately. Useful in tests. */
         public fun noDelay(): Builder = delay(0, 0)
 
+        /**
+         * Fails a request that has no mock file with a [MissingMockException] instead of answering
+         * 404. Meant for tests, where a forgotten mock should not look like a server error.
+         */
+        public fun failOnMissingMock(): Builder = apply { failOnMissingMock = true }
+
+        /**
+         * Keeps every request in [OkHttpMockInterceptor.recordedCalls] so a test can check what was
+         * called. Off by default, because the list grows for as long as the interceptor is used.
+         */
+        public fun recordCalls(): Builder = apply { recordCalls = true }
+
         /** Creates the interceptor, validating the configuration. */
         public fun build(): OkHttpMockInterceptor = OkHttpMockInterceptor(
             inputStreamProvider,
@@ -242,6 +289,8 @@ public class OkHttpMockInterceptor private constructor(
             maxDelayMilliseconds,
             failureCode,
             logger,
+            failOnMissingMock,
+            recordCalls,
         )
     }
 

@@ -18,6 +18,7 @@ contents of a file whose path mirrors the request URL, so the real network is ne
 - **Status code and headers per mock**, written inside the mock file itself.
 - **Paths with ids.** `users/{id}.json` answers `/users/1`, `/users/42` and any other id.
 - **404 instead of a crash** when no mock matches, with the list of files that were tried.
+- **Options for tests:** fail on a missing mock and check which calls were made.
 - Written in Kotlin, still usable from Java. Works on any JVM project, not only Android.
 
 ## Installation
@@ -29,6 +30,12 @@ dependencies {
     implementation("io.github.brodriro:okhttp-json-mock:4.0.0")
 }
 ```
+
+Requirements:
+
+- Java 8 or newer. On Android, API 21 or newer, which is what OkHttp supports.
+- OkHttp 4.12 or newer, including 5.x.
+- In Kotlin projects, Kotlin 1.9 or newer. Java projects need nothing else.
 
 ## Quick start
 
@@ -70,6 +77,13 @@ InputStreamProvider assets = path -> {
 OkHttpClient client = new OkHttpClient.Builder()
     .addInterceptor(new OkHttpMockInterceptor.Builder(assets).build())
     .build();
+```
+
+The interceptor answers **every** request of the client it is added to, so add it only where you want
+mocks, typically in debug builds:
+
+```kotlin
+if (BuildConfig.DEBUG) builder.addInterceptor(OkHttpMockInterceptor.Builder(assets).build())
 ```
 
 On a plain JVM project, `OkHttpMockInterceptor.Builder()` without arguments reads the files from the
@@ -220,6 +234,37 @@ The interceptor answers `404` with a plain-text body that lists the files it loo
 No mock file found for GET /api/v1/unknown. Tried: api/v1/unknown.get.json, api/v1/unknown.json and 12 more with {id} in place of a path segment
 ```
 
+The same text goes to the log. In tests you can make this an exception instead: see
+[Using it in tests](#using-it-in-tests).
+
+## Using it in tests
+
+Two options make the interceptor stricter, which is what a test usually wants:
+
+```kotlin
+val interceptor = OkHttpMockInterceptor.Builder(provider)
+    .noDelay()
+    .failOnMissingMock()   // a request without a mock throws instead of answering 404
+    .recordCalls()         // keep the requests that were received
+    .build()
+```
+
+With `failOnMissingMock()`, a request that has no mock file fails with a `MissingMockException`. It
+is an `IOException` whose message names the request and the files that were tried, so a forgotten
+mock shows up as what it is and not as a server error handled somewhere in your code.
+
+With `recordCalls()`, the interceptor keeps what it received:
+
+```kotlin
+val created = interceptor.recordedCalls.single { it.method == "POST" }
+assertEquals("/api/v1/users", created.url.encodedPath)
+assertEquals(201, created.statusCode)
+assertEquals("api/v1/users.post.json", created.mockFile)
+```
+
+`clearRecordedCalls()` empties the list between tests. Recording is off by default because the list
+grows for as long as the interceptor is used.
+
 ## Example
 
 The [sample app](app) reads its mocks from [`app/src/main/assets`](app/src/main/assets):
@@ -247,7 +292,6 @@ api/v1/
 2. Change the imports from `ir.mirrajabi.okhttpjsonmock` to `io.github.brodriro.okhttpjsonmock`.
 3. If you called the setters (`setBasePath`, `setFailurePercentage`, ...), use `OkHttpMockInterceptor.Builder`
    instead. Instances are now immutable.
-
 4. In Kotlin, a provider written as `object : InputStreamProvider` must declare the parameter as
    non-null: `override fun provide(path: String): InputStream?`. It can also become a lambda:
    `InputStreamProvider { path -> ... }`.
@@ -265,14 +309,15 @@ If the fallback only exists to answer any id, drop it and name the file `{id}.js
 
 Behaviour that changed:
 
-- A request without a mock answers `404` instead of throwing `IllegalStateException`.
+- A request without a mock answers `404` instead of throwing `IllegalStateException`. If you relied
+  on the exception, build the interceptor with `failOnMissingMock()`.
 - A simulated failure has an empty body instead of the contents of the mock.
 - `ResourcesHelper` was removed.
-- OkHttp 4.12 is required.
+- OkHttp 4.12 or newer is required, and Kotlin projects need Kotlin 1.9 or newer.
 
 ## Changelog
 
-4.0.0 - `Kotlin, mocks per HTTP method, status code and headers per mock, {id} paths, 404 for missing mocks, Builder`
+4.0.0 - `Kotlin, mocks per HTTP method, status code and headers per mock, {id} paths, 404 for missing mocks, Builder, options for tests`
 
 3.0 - `Removed wrapper for mocked responses`
 

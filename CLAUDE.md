@@ -11,6 +11,8 @@ A small JVM library that mocks HTTP responses for OkHttp/Retrofit: an OkHttp `In
 - `okhttp-json-mock/` — the library. Kotlin (`explicitApi`), Java 8 bytecode, language/API version 2.0 and `kotlin-stdlib` 2.0.21 on purpose (so consumers on Kotlin 1.9+ can read its metadata; do not use newer language features or stdlib APIs), published as `io.github.brodriro:okhttp-json-mock`.
 - `app/` — Android sample app in Kotlin (Retrofit suspend calls, coroutines, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...` and is also exercised by the library's `SampleMocksTest`. It needs no Kotlin plugin: AGP 9 compiles Kotlin on its own.
 
+- `consumer-test/` — standalone Gradle build, not included in the root project, that consumes the published artifact from `mavenLocal` from Kotlin and Java. CI runs it against several Kotlin versions.
+
 ## Commands
 
 Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions in `gradle/libs.versions.toml`. Needs JDK 17+ (21 is what is installed locally). `app` also needs an Android SDK (`ANDROID_HOME` or `local.properties`) with platform 36.
@@ -27,7 +29,7 @@ The library has JUnit 5 tests written in Kotlin under `okhttp-json-mock/src/test
 ```sh
 ./gradlew :okhttp-json-mock:test                                              # all library tests
 ./gradlew :okhttp-json-mock:test --tests 'io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptorTest'
-./gradlew build                                                             # compile + tests + ktlint + Android lint
+./gradlew build                                                             # compile + tests + ktlint + API check + Android lint
 ./gradlew ktlintFormat                                                      # fix code style violations
 ```
 
@@ -78,11 +80,12 @@ Behaviours that are easy to miss:
 - A provider is asked for the method files before the shared ones. A provider with its own fallback (for example a generic `_id.json` for any id) must not mistake the method suffix for a path segment (the built-in `{id}` files make such providers unnecessary); this broke a real app during migration and is called out in the README migration guide.
 - The real network is never hit: `chain.proceed` is not called.
 - No matching file → 404 with a `text/plain` body listing the exact-path files that were tried and counting the `{id}` ones. This wins over the simulated failure.
+- `Builder.failOnMissingMock()` replaces that 404 with a `MissingMockException` (an `IOException`, so asynchronous calls get it in `onFailure`). `Builder.recordCalls()` keeps each request as a `RecordedCall` (method, url, mock file, status; status is `null` when the call failed for a missing mock) in `recordedCalls`, a snapshot guarded by a lock; `clearRecordedCalls()` empties it. Both are off by default and unavailable through the 3.0 constructors.
 - `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
 - Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms); equal bounds give a fixed delay. An interrupt during the sleep throws `InterruptedIOException`.
 - A plain mock is returned byte for byte as `application/json`; an envelope's `response` is re-serialised by Gson (compact, nulls and number text preserved). The status line carries the standard reason phrase.
 - Gson is an `implementation` dependency used only by `MockEnvelope`; files that do not contain the text `statusCode` are never parsed.
-- Instances are immutable. They are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
+- The configuration is immutable; the only mutable state is the list of recorded calls. Instances are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
 - Each call logs one line through `MockLogger` (`STDOUT` by default, `NONE` to silence).
 - Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`) throws `IllegalArgumentException` at construction.
 

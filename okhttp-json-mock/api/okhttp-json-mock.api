@@ -1,3 +1,10 @@
+public final class io/github/brodriro/okhttpjsonmock/MissingMockException : java/io/IOException {
+	public fun <init> (Ljava/lang/String;Lokhttp3/HttpUrl;Ljava/util/List;Ljava/lang/String;)V
+	public final fun getMethod ()Ljava/lang/String;
+	public final fun getTriedFiles ()Ljava/util/List;
+	public final fun getUrl ()Lokhttp3/HttpUrl;
+}
+
 public abstract interface class io/github/brodriro/okhttpjsonmock/MockLogger {
 	public static final field Companion Lio/github/brodriro/okhttpjsonmock/MockLogger$Companion;
 	public static final field NONE Lio/github/brodriro/okhttpjsonmock/MockLogger;
@@ -13,11 +20,13 @@ public final class io/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor : okh
 	public fun <init> (Lio/github/brodriro/okhttpjsonmock/providers/InputStreamProvider;I)V
 	public fun <init> (Lio/github/brodriro/okhttpjsonmock/providers/InputStreamProvider;III)V
 	public fun <init> (Lio/github/brodriro/okhttpjsonmock/providers/InputStreamProvider;ILjava/lang/String;II)V
+	public final fun clearRecordedCalls ()V
 	public final fun getBasePath ()Ljava/lang/String;
 	public final fun getFailureCode ()I
 	public final fun getFailurePercentage ()I
 	public final fun getMaxDelayMilliseconds ()I
 	public final fun getMinDelayMilliseconds ()I
+	public final fun getRecordedCalls ()Ljava/util/List;
 	public fun intercept (Lokhttp3/Interceptor$Chain;)Lokhttp3/Response;
 }
 
@@ -27,10 +36,20 @@ public final class io/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Build
 	public final fun basePath (Ljava/lang/String;)Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Builder;
 	public final fun build ()Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor;
 	public final fun delay (II)Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Builder;
+	public final fun failOnMissingMock ()Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Builder;
 	public final fun failureCode (I)Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Builder;
 	public final fun failurePercentage (I)Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Builder;
 	public final fun logger (Lio/github/brodriro/okhttpjsonmock/MockLogger;)Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Builder;
 	public final fun noDelay ()Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Builder;
+	public final fun recordCalls ()Lio/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Builder;
+}
+
+public final class io/github/brodriro/okhttpjsonmock/RecordedCall {
+	public final fun getMethod ()Ljava/lang/String;
+	public final fun getMockFile ()Ljava/lang/String;
+	public final fun getStatusCode ()Ljava/lang/Integer;
+	public final fun getUrl ()Lokhttp3/HttpUrl;
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/brodriro/okhttpjsonmock/providers/DefaultInputStreamProvider : io/github/brodriro/okhttpjsonmock/providers/InputStreamProvider {

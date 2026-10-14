@@ -36,6 +36,12 @@ public final class JavaConsumer {
         try (Response response = legacy.newCall(request).execute()) {
             results.put("constructor kept from 3.0", response.code() == 200);
         }
+        OkHttpMockInterceptor recording = new OkHttpMockInterceptor.Builder(provider)
+            .noDelay().logger(MockLogger.NONE).failOnMissingMock().recordCalls().build();
+        OkHttpClient strict = new OkHttpClient.Builder().addInterceptor(recording).build();
+        strict.newCall(request).execute().close();
+        results.put("recorded calls", recording.getRecordedCalls().size() == 1
+            && Integer.valueOf(200).equals(recording.getRecordedCalls().get(0).getStatusCode()));
         return results;
     }
 }
