@@ -28,6 +28,7 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 - [Paths with ids](#paths-with-ids)
 - [One URL, different HTTP methods](#one-url-different-http-methods)
 - [The response: status codes, headers and latency per mock](#the-response-status-codes-headers-and-latency-per-mock)
+- [Mocks that are not JSON](#mocks-that-are-not-json)
 - [Latency](#latency)
 - [Simulated failures](#simulated-failures)
 - [Logging](#logging)
@@ -54,6 +55,8 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 - **Status code, headers and latency per mock**, written inside the mock file:
   `{ "statusCode": 201, "headers": { ... }, "delayMs": 2000, "response": { ... } }`.
   [More](#the-response-status-codes-headers-and-latency-per-mock)
+- **Not only JSON:** XML, plain text, images or any other file, served with the `Content-Type` of its
+  extension once the extension is listed. [More](#mocks-that-are-not-json)
 - **Simulated network:** a random latency on every call, and an optional percentage of calls that
   fail with a configurable status. [Latency](#latency), [failures](#simulated-failures)
 - **Clear answers when something is missing:** a 404 that lists the files that were looked for, or an
@@ -255,6 +258,9 @@ Only when none of those exists does it try the same names with `{id}` in place o
 segment at a time starting from the last (`api/v1/{id}`, `api/{id}/users`, `{id}/v1/users`), then two
 at a time. The `basePath` is prepended to every name.
 
+With [other extensions](#mocks-that-are-not-json) each of these names is tried with every extension, in
+the order they were listed, before moving to the next name.
+
 ## The response: status codes, headers and latency per mock
 
 By default the file **is** the response body, returned byte for byte with status `200` and
@@ -321,6 +327,48 @@ An error with a body:
   "response": { "error": "email_taken", "message": "That email is already registered" }
 }
 ```
+
+## Mocks that are not JSON
+
+Mock files are `.json` unless more extensions are listed with `extensions(...)`:
+
+```kotlin
+OkHttpMockInterceptor.Builder(provider)
+    .extensions("json", "xml", "png")
+    .build()
+```
+
+`GET /api/v1/feed` is then answered by the first of `api/v1/feed.get.json`, `api/v1/feed.get.xml`,
+`api/v1/feed.get.png`, `api/v1/feed.json`, `api/v1/feed.xml` and `api/v1/feed.png` that exists. A
+more specific name always wins over the order of the extensions, and `{id}` files work with any
+extension: `images/{id}.png` answers `/images/1` and `/images/42`.
+
+The file is returned byte for byte, so binary files such as images arrive untouched, with the
+`Content-Type` of the extension that matched:
+
+| Extension | `Content-Type` |
+| --- | --- |
+| `json` | `application/json` |
+| `txt` | `text/plain; charset=utf-8` |
+| `html`, `htm` | `text/html; charset=utf-8` |
+| `csv` | `text/csv; charset=utf-8` |
+| `xml` | `application/xml` |
+| `svg` | `image/svg+xml` |
+| `png` | `image/png` |
+| `jpg`, `jpeg` | `image/jpeg` |
+| `gif` | `image/gif` |
+| `webp` | `image/webp` |
+| `pdf` | `application/pdf` |
+| any other | `application/octet-stream` |
+
+Good to know:
+
+- **The list replaces the default**, so include `json` to keep finding JSON mocks. A leading dot is
+  ignored (`".xml"` is `"xml"`), and an extension is letters and digits only.
+- **Only `.json` files are read as [wrappers](#the-response-status-codes-headers-and-latency-per-mock).**
+  Any other file is served as it is with status `200`, even if its text looks like a wrapper.
+- **Each extension adds one lookup per file name.** Listing three extensions asks the provider for
+  three times as many files, so list only the ones in use and keep `provide` cheap for a missing file.
 
 ## Latency
 
@@ -479,18 +527,19 @@ Mocks only for tests can go in `src/test/resources` and be read from the classpa
 | `failurePercentage(Int)` | `0` | From 0 to 100. |
 | `failureCode(Int)` | `504` | A 4xx or 5xx status. |
 | `logger(MockLogger)` | `MockLogger.STDOUT` | `MockLogger.NONE` silences it. |
+| `extensions(vararg String)` | `"json"` | Extensions of mock files, in the order they are tried. Replaces the default. See [Mocks that are not JSON](#mocks-that-are-not-json). |
 | `failOnMissingMock()` | off | Throw `MissingMockException` instead of answering 404. |
 | `recordCalls()` | off | Keep the requests in `recordedCalls`. |
 | `build()` | | Validates the configuration and throws `IllegalArgumentException` if a value is out of range. |
 
 The interceptor exposes its configuration as read-only properties: `basePath`, `failurePercentage`,
-`failureCode`, `minDelayMilliseconds` and `maxDelayMilliseconds`, plus `recordedCalls` and
+`failureCode`, `minDelayMilliseconds`, `maxDelayMilliseconds` and `extensions`, plus `recordedCalls` and
 `clearRecordedCalls()` (see [Using it in tests](#using-it-in-tests)).
 
 ### Constructors kept from 3.0
 
 They keep existing code working. New code is clearer with the builder, which is also the only way to
-set `failureCode`, `logger`, `failOnMissingMock()` and `recordCalls()`.
+set `failureCode`, `logger`, `extensions`, `failOnMissingMock()` and `recordCalls()`.
 
 | Constructor | Equivalent builder |
 | --- | --- |
@@ -510,7 +559,8 @@ The contract:
 - **Return `null` for a missing file, quickly and without logging.** The interceptor asks for several
   names per request and most of them do not exist: up to six for a request whose exact file exists, and
   from a handful to over a hundred, depending on the number of path segments and query parameters, for
-  one answered by an `{id}` file or by nothing.
+  one answered by an `{id}` file or by nothing. Each extension listed with `extensions(...)` multiplies
+  those numbers.
 - **Open exactly the file you are asked for.** Answering an unknown name with some other file breaks
   the order in which mocks are chosen, because the provider is asked for the method files before the
   shared ones. `{id}` files cover the usual reason for doing it.
@@ -595,7 +645,7 @@ own interceptor, or its own provider map, since the file for a URL is always the
 2. The method, path and query of the request are turned into the list of candidate files described
    in [the full lookup order](#the-full-lookup-order). Host, headers and body play no part.
 3. The provider is asked for each candidate in turn, and the first one it has is the mock.
-4. If the mock is a wrapper, its status, headers, latency and body are read from it.
+4. If the mock is a `.json` wrapper, its status, headers, latency and body are read from it.
 5. The interceptor waits the latency, decides whether the call is a simulated failure, logs one line,
    records the call if asked to, and builds the response with protocol `HTTP/1.1`.
 
