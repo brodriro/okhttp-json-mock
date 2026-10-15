@@ -1,9 +1,12 @@
 package io.github.brodriro.okhttpjsonmock
 
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
@@ -101,30 +104,55 @@ class ExtensionsTest {
         assertContentEquals(png, response.body!!.bytes())
     }
 
+    /**
+     * One case per extension, each served from a real file of that type in `src/test/resources/extensions`
+     * (`yaml` stands for an extension that is not in the table). [signature] is how the file starts.
+     */
+    @ParameterizedTest(name = "{0} is served as {1}")
+    @CsvSource(
+        delimiter = '|',
+        value = [
+            "json | application/json          | {",
+            "txt  | text/plain; charset=utf-8 | Texto",
+            "html | text/html; charset=utf-8  | <!DOCTYPE html>",
+            "htm  | text/html; charset=utf-8  | <!DOCTYPE html>",
+            "csv  | text/csv; charset=utf-8   | id,name,price",
+            "xml  | application/xml           | <?xml",
+            "svg  | image/svg+xml             | <svg",
+            "png  | image/png                 | \u0089PNG",
+            "jpg  | image/jpeg                | \u00FF\u00D8\u00FF",
+            "jpeg | image/jpeg                | \u00FF\u00D8\u00FF",
+            "gif  | image/gif                 | GIF89a",
+            "webp | image/webp                | RIFF",
+            "pdf  | application/pdf           | %PDF-",
+            "yaml | application/octet-stream  | name:",
+        ],
+    )
+    fun `each extension is served byte for byte with its content type`(
+        extension: String,
+        contentType: String,
+        signature: String,
+    ) {
+        val file = javaClass.classLoader.getResource("extensions/sample.$extension")!!.readBytes()
+        val resources = InputStreamProvider { path -> javaClass.classLoader.getResourceAsStream(path) }
+        val interceptor = builder(resources).basePath("extensions/").extensions(extension).build()
+
+        val response = interceptor.get("http://example.com/sample")
+
+        assertEquals(200, response.code)
+        assertEquals(contentType, response.header("Content-Type"))
+        assertEquals(contentType.toMediaType(), response.body!!.contentType())
+        val body = response.body!!.bytes()
+        assertContentEquals(file, body)
+        val start = signature.toByteArray(Charsets.ISO_8859_1)
+        assertContentEquals(start, body.copyOf(start.size))
+    }
+
     @Test
-    fun `each known extension has its content type and any other is binary`() {
-        val expected = mapOf(
-            "txt" to "text/plain; charset=utf-8",
-            "html" to "text/html; charset=utf-8",
-            "htm" to "text/html; charset=utf-8",
-            "csv" to "text/csv; charset=utf-8",
-            "xml" to "application/xml",
-            "svg" to "image/svg+xml",
-            "png" to "image/png",
-            "jpg" to "image/jpeg",
-            "jpeg" to "image/jpeg",
-            "JPG" to "image/jpeg",
-            "gif" to "image/gif",
-            "webp" to "image/webp",
-            "pdf" to "application/pdf",
-            "yaml" to "application/octet-stream",
-        )
+    fun `the content type does not depend on the case of the extension`() {
+        val interceptor = builder(provider("photo.JPG" to "x")).extensions("JPG").build()
 
-        expected.forEach { (extension, contentType) ->
-            val interceptor = builder(provider("file.$extension" to "x")).extensions(extension).build()
-
-            assertEquals(contentType, interceptor.get("http://example.com/file").header("Content-Type"), extension)
-        }
+        assertEquals("image/jpeg", interceptor.get("http://example.com/photo").header("Content-Type"))
     }
 
     @Test
