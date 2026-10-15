@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "io.github.brodriro"
-version = "4.0.0"
+version = "4.0.0-rc.1"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_1_8
