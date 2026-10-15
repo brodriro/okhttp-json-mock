@@ -11,8 +11,13 @@ import java.util.Locale
  *
  * A file or folder named `{id}` stands for any value of that path segment: `users/{id}.json`
  * answers `/users/1` and `/users/42`, and `users/{id}/posts.json` answers `/users/7/posts`.
+ *
+ * Files end in one of [extensions], `.json` unless others are configured.
  */
-internal class MockFileResolver(private val basePath: String) {
+internal class MockFileResolver(
+    private val basePath: String,
+    private val extensions: List<String> = listOf(DEFAULT_EXTENSION),
+) {
 
     /**
      * Files that can answer a [method] request to [url], most specific first. The path exactly as
@@ -20,13 +25,14 @@ internal class MockFileResolver(private val basePath: String) {
      * wins over a generic one. For each path, the files for that method come before the files
      * shared by every method, and within each of those groups the file for the exact query string
      * comes first, then the file for the query with its parameters sorted, then the file for the path.
+     * Each of those names is tried with every extension, in the order they were given, before the next name.
      */
     fun candidates(method: String, url: HttpUrl): List<String> {
         val queries = queryVariants(url.encodedQuery)
         val suffix = method.lowercase(Locale.ROOT)
         return pathVariants(url.encodedPath.trim('/')).flatMap { path ->
             val stems = queries.map { "$path/$it" } + path
-            stems.map { "$basePath$it.$suffix.json" } + stems.map { "$basePath$it.json" }
+            (stems.map { "$it.$suffix" } + stems).flatMap { stem -> extensions.map { "$basePath$stem.$it" } }
         }
     }
 
@@ -59,6 +65,9 @@ internal class MockFileResolver(private val basePath: String) {
 
     internal companion object {
         const val ROOT_FILE_NAME = "index"
+
+        /** Extension of mock files when no others are configured. */
+        const val DEFAULT_EXTENSION = "json"
 
         /** File or folder name that matches any value of a path segment. */
         const val PLACEHOLDER = "{id}"

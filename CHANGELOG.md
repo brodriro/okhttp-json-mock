@@ -8,7 +8,12 @@ released by this fork as `io.github.brodriro:okhttp-json-mock`.
 
 ## 4.1.0 (unreleased)
 
-No changes yet.
+### Added
+
+- Mocks that are not JSON: `Builder.extensions("json", "xml", "png")` lists the extensions of mock
+  files, tried in that order for each file name, and the response gets the `Content-Type` of the
+  extension that matched. Only `.json` files are read as wrappers. The configured list can be read back
+  as `extensions`. Without it only `.json` files are looked up, as before.
 
 ## 4.0.0
 
