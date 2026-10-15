@@ -217,7 +217,7 @@ api/v1/users/{id}.delete.json        DELETE /api/v1/users/<any id>
 
 - The name is always `{id}`, whatever the parameter is called in your API.
 - A file for the exact path wins over `{id}`, so `users/search.json` and `users/1.json` keep answering
-  their own URLs. Adding an `{id}` file never changes the answer of a URL that already had a mock.
+  their own URLs. Adding an `{id}` file never changes the answer of a URL that has a file of its own.
 - Up to two segments of a path can be `{id}`, as in `orders/{id}/items/{id}.json`. When several `{id}`
   files could answer, a file with one `{id}` wins over a file with two, and among those with the same
   number the one that replaces later segments wins: `users/{id}` before `{id}/1`.
@@ -509,7 +509,7 @@ The contract:
 
 - **Return `null` for a missing file, quickly and without logging.** The interceptor asks for several
   names per request and most of them do not exist: up to six for a request whose exact file exists, and
-  from a dozen to over a hundred, depending on the number of path segments and query parameters, for
+  from a handful to over a hundred, depending on the number of path segments and query parameters, for
   one answered by an `{id}` file or by nothing.
 - **Open exactly the file you are asked for.** Answering an unknown name with some other file breaks
   the order in which mocks are chosen, because the provider is asked for the method files before the
@@ -656,8 +656,9 @@ GET /api/v1/users/search -> 200 from api/v1/users/{id}.json
 
 - An `{id}` file answers every path that has no file of its own. Add a file for the exact path,
   here `users/search.json`, and it takes precedence.
-- A file with a method suffix wins over one without it, and a file for a query wins over the file
-  for the path. See [the full lookup order](#the-full-lookup-order).
+- For the same path, a file with a method suffix wins over one without it, even over a file for the
+  query; within each of those groups, a file for the query wins over the file for the path. A file
+  for the exact path wins over any `{id}` file. See [the full lookup order](#the-full-lookup-order).
 - If you wrote your own `InputStreamProvider`, check that it opens exactly the file it is asked for
   and returns `null` for anything else. A provider that falls back to another file changes which
   mock is chosen.
@@ -678,8 +679,9 @@ whatever the interceptor says.
 **A test passes although a mock is missing.** By default a missing mock is a 404, which your code
 may handle like any server error. Build the interceptor with `failOnMissingMock()` in tests.
 
-**The app crashes with a `NullPointerException` on a field declared non-null.** Gson fills the fields
-that are missing from the mock with `null`, even when Kotlin declares them non-null, and the crash
+**The app crashes with a `NullPointerException` on a field declared non-null.** Gson leaves the fields
+that are missing from the mock `null` (or `0`/`false` for primitives), even when Kotlin declares them
+non-null, unless every property of the class has a default value. The crash
 happens later, where the field is used. Check that the mock has every field of the class it is read
 into; a unit test that reads the app's mocks, as in [Using it in tests](#using-it-in-tests), catches it
 before the app runs.
@@ -718,8 +720,8 @@ Behaviour that changed:
 - A simulated failure has an empty body instead of the contents of the mock.
 - A mock file that is an object with `statusCode` and no keys other than `headers`, `delayMs` and
   `response` is now read as a wrapper. Rename such a key, or wrap the file, if it was meant as a body.
-- `failurePercentage` outside 0–100 and a minimum delay above the maximum now throw
-  `IllegalArgumentException` when the interceptor is created.
+- `failurePercentage` outside 0–100, a negative minimum delay and a minimum delay above the maximum
+  now throw `IllegalArgumentException` when the interceptor is created.
 - The status line carries a standard reason phrase instead of the mock's contents, responses are
   HTTP/1.1, and the log line has a new format.
 - `ResourcesHelper` was removed.

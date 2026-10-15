@@ -83,7 +83,7 @@ Each candidate is handed to an `InputStreamProvider`, the single extension point
 Behaviours that are easy to miss:
 
 - Host, headers and request body are ignored; only method, path and query select the file.
-- Every miss costs one provider call. A request whose exact file exists makes at most six lookups; a request answered by an `{id}` file, or by nothing, makes a few dozen (two to six per path variant, with `1 + n + n(n-1)/2` variants for `n` segments). Providers must return `null` quietly and cheaply for a missing file.
+- Every miss costs one provider call. A request whose exact file exists makes at most six lookups; a request answered by an `{id}` file, or by nothing, makes from a handful to over a hundred (two to six per path variant, with `1 + n + n(n-1)/2` variants for `n` segments). Providers must return `null` quietly and cheaply for a missing file.
 - A provider is asked for the method files before the shared ones. A provider with its own fallback (for example a generic `_id.json` for any id) must not mistake the method suffix for a path segment (the built-in `{id}` files make such providers unnecessary); this broke a real app during migration and is called out in the README migration guide.
 - The real network is never hit: `chain.proceed` is not called.
 - No matching file → 404 with a `text/plain` body listing the exact-path files that were tried and counting the `{id}` ones. This wins over the simulated failure.

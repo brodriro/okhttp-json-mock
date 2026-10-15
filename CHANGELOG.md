@@ -40,7 +40,7 @@ First release of the fork. See [Migrating from 3.0](README.md#migrating-from-30)
 - A request without a mock answers 404 with the list of files that were tried, instead of throwing
   `IllegalStateException`.
 - A simulated failure answers with an empty body instead of the contents of the mock.
-- Each call logs one line with the method, the URL, the status and the mock file.
+- Each call logs one line with the method, the path and query, the status and the mock file.
 - Interceptors are immutable. The setters were removed in favour of the builder.
 - `InputStreamProvider` is a functional interface whose `path` is never null, and it is asked for
   more file names per request.
