@@ -47,6 +47,7 @@ app/                      Android sample app, uses the library as a project depe
 consumer-test/            separate Gradle build that uses the library from mavenLocal, like a real project
 gradle/libs.versions.toml versions of every dependency and plugin
 .github/workflows/        CI, release, snapshot and API reference workflows
+jitpack.yml               build of preview versions on JitPack
 ```
 
 ## How the code is organised
@@ -100,8 +101,9 @@ One commit per change, with a message of the form `[type] Description` in Englis
 
 `./gradlew build` runs what the CI runs:
 
-- **Tests.** New behaviour needs a test. The tests drive the interceptor through a real
-  `OkHttpClient` with an in-memory provider.
+- **Tests.** New behaviour needs a test. Most tests drive the interceptor through a real
+  `OkHttpClient` with an in-memory provider; the resolver, the wrapper and the reason phrases also
+  have unit tests of their own.
 - **Code style**, with ktlint. `./gradlew ktlintFormat` fixes most problems.
 - **Public API.** The API is recorded in `okhttp-json-mock/api/okhttp-json-mock.api` and the build
   fails if it changes. If you changed it on purpose, run `./gradlew :okhttp-json-mock:updateKotlinAbi`
@@ -127,7 +129,8 @@ The library is used from Java and from old Kotlin compilers, so:
 - It must keep working with OkHttp 4.12 and with 5.x.
 - Mock files that work today must keep working: do not change which file answers a request.
 - Anything that is not meant for users stays `internal`. The library is compiled with `explicitApi`,
-  so every public declaration needs an explicit visibility and KDoc, which becomes the API reference.
+  so every public declaration needs an explicit visibility. Give it KDoc too: it becomes the API
+  reference.
 
 ## Documentation
 
@@ -138,7 +141,8 @@ test or a mock of the sample app, so they keep working.
 ## Releases
 
 Releases are made by the maintainer from `master`: a `vX.Y.Z` tag builds, signs and uploads the
-artifacts to Maven Central and publishes the API reference. Pushes to `develop` publish a snapshot
+artifacts to the Maven Central portal, where the maintainer publishes them, and publishes the API
+reference. Pushes to `develop` publish a snapshot
 while the version ends in `-SNAPSHOT`. A published version can never be replaced, so a mistake is
 fixed with a new patch version.
 
