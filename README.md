@@ -304,8 +304,8 @@ Good to know:
   `422 Unprocessable Content`, `503 Service Unavailable`. A code without a registered name gets the
   name of its class, such as `Client Error`.
 - **An invalid wrapper fails the call** with an `IOException` that names the file: a `statusCode` out
-  of range, `headers` that is not an object of valid header names with simple values, or a `delayMs` that is not a whole number
-  from 0 up.
+  of range, `headers` that is not an object of valid header names with simple values, or a `delayMs`
+  that is not a whole number from 0 up.
 
 A response with no body:
 
@@ -362,7 +362,8 @@ JsonMockServer: GET /api/v1/users -> 503, simulated failure
 JsonMockServer: GET /api/v1/unknown -> 404, no mock found. Tried: api/v1/unknown.get.json, api/v1/unknown.json and 12 more with {id} in place of a path segment
 ```
 
-Send it somewhere else, or silence it, with `logger`:
+File names are written with the `basePath` in front. Send the log somewhere else, or silence it, with
+`logger`:
 
 ```kotlin
 .logger { message -> Log.d("Mocks", message) }   // Android Logcat
@@ -446,7 +447,7 @@ Recording is off by default because the list grows for as long as the intercepto
 | --- | --- |
 | `method` | HTTP method of the request. |
 | `url` | `HttpUrl` of the request, with its query. |
-| `mockFile` | The file that answered, or `null` when none matched. |
+| `mockFile` | The file that answered, with the `basePath` in front, or `null` when none matched. |
 | `statusCode` | The status of the answer, a simulated failure's included, or `null` when the call failed with `MissingMockException`. |
 
 The request body and headers are not recorded.
@@ -677,6 +678,12 @@ whatever the interceptor says.
 **A test passes although a mock is missing.** By default a missing mock is a 404, which your code
 may handle like any server error. Build the interceptor with `failOnMissingMock()` in tests.
 
+**The app crashes with a `NullPointerException` on a field declared non-null.** Gson fills the fields
+that are missing from the mock with `null`, even when Kotlin declares them non-null, and the crash
+happens later, where the field is used. Check that the mock has every field of the class it is read
+into; a unit test that reads the app's mocks, as in [Using it in tests](#using-it-in-tests), catches it
+before the app runs.
+
 **Requests reach the real server.** The interceptor was added to another `OkHttpClient` than the one
 Retrofit uses, or only in a build type you are not running. (Added with `addNetworkInterceptor`
 instead, every call fails with `IllegalStateException: network interceptor … must call proceed() exactly
@@ -684,7 +691,8 @@ once`.)
 
 ## Migrating from 3.0
 
-1. Change the dependency to `io.github.brodriro:okhttp-json-mock:4.0.0`.
+1. Change the dependency to `io.github.brodriro:okhttp-json-mock:4.0.0`, which is on Maven Central.
+   If the JitPack repository was only there for this library, remove it.
 2. Change the imports from `ir.mirrajabi.okhttpjsonmock` to `io.github.brodriro.okhttpjsonmock`.
 3. If you called the setters (`setBasePath`, `setFailurePercentage`, ...), use `OkHttpMockInterceptor.Builder`
    instead. Instances are now immutable.
