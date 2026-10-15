@@ -15,7 +15,10 @@ First release of the fork. See [Migrating from 3.0](README.md#migrating-from-30)
 - Mocks per HTTP method: `users.get.json` and `users.post.json` answer `GET /users` and `POST /users`.
   A file without a method answers every method.
 - Status code and headers per mock, written in the mock file:
-  `{ "statusCode": 201, "headers": { ... }, "response": { ... } }`.
+  `{ "statusCode": 201, "headers": { ... }, "response": { ... } }`. Header values may be strings,
+  numbers or booleans, and `Content-Type` replaces the default.
+- An invalid wrapper (status out of range, bad headers, bad `delayMs`) fails the call with an
+  `IOException` that names the file.
 - Latency per mock with `delayMs` in the same wrapper, which replaces the delay of the interceptor for
   that file.
 - `{id}` files and folders that answer any value of a path segment, such as `users/{id}.json`.
@@ -23,9 +26,11 @@ First release of the fork. See [Migrating from 3.0](README.md#migrating-from-30)
   `failureCode` and `logger`.
 - `MockLogger`, to send the one-line log of each call somewhere else or to silence it.
 - Options for tests: `failOnMissingMock()`, which throws `MissingMockException`, and `recordCalls()`,
-  which keeps the requests received in `recordedCalls`.
+  which keeps the requests received in `recordedCalls` as `RecordedCall`s (method, URL, mock file,
+  status); `clearRecordedCalls()` empties it.
+- The configuration can be read back from the interceptor, including the new `failureCode`.
 - A query with several parameters also matches a file named with the parameters sorted.
-- The root path `/` is looked up as `index.json`.
+- The root path `/` is looked up as `index`, so `index.json` (or `index.get.json`) answers it.
 
 ### Changed
 
@@ -35,6 +40,7 @@ First release of the fork. See [Migrating from 3.0](README.md#migrating-from-30)
 - A request without a mock answers 404 with the list of files that were tried, instead of throwing
   `IllegalStateException`.
 - A simulated failure answers with an empty body instead of the contents of the mock.
+- Each call logs one line with the method, the URL, the status and the mock file.
 - Interceptors are immutable. The setters were removed in favour of the builder.
 - `InputStreamProvider` is a functional interface whose `path` is never null, and it is asked for
   more file names per request.
