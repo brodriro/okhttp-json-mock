@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, master]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      # Compiles the library and the sample, runs the tests, ktlint, the public API check, the
+      # coverage check and Android lint. The release build of the sample is shrunk with R8, which
+      # fails here if the library needs keep rules it does not ship.
+      - name: Build
+        run: ./gradlew build
+
+      - name: Coverage report
+        if: always()
+        run: ./gradlew :okhttp-json-mock:koverLog :okhttp-json-mock:koverHtmlReport
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: okhttp-json-mock/build/reports/kover/html/
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reports
+          path: '**/build/reports/'
+
+  # Builds an outside project against the published artifact with several Kotlin compilers,
+  # which is what catches metadata or dependency problems the library's own tests cannot see.
+  consumer:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kotlin: 1.9.25
+          - kotlin: 2.0.21
+          - kotlin: 2.2.21
+          - kotlin: 2.4.21
+          - kotlin: 2.4.21
+            okhttp: 5.5.0
+    name: consumer (Kotlin ${{ matrix.kotlin }}${{ matrix.okhttp && format(', OkHttp {0}', matrix.okhttp) || '' }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Old Kotlin plugins do not run on the Gradle of the wrapper, so the consumer uses its own.
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          gradle-version: 8.10.2
+
+      - name: Publish the library to the local Maven repository
+        run: ./gradlew :okhttp-json-mock:publishToMavenLocal
+
+      - name: Run the consumer project
+        run: >
+          gradle -p consumer-test run
+          -PkotlinVersion=${{ matrix.kotlin }}
+          ${{ matrix.okhttp && format('-PokhttpVersion={0}', matrix.okhttp) || '' }}
+
+  # Single check for branch protection: it stays the same when the matrix above changes.
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [build, consumer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless every job succeeded
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.consumer.result }}" != "success" ]; then
+            echo "build: ${{ needs.build.result }}, consumer: ${{ needs.consumer.result }}" >&2
+            exit 1
+          fi

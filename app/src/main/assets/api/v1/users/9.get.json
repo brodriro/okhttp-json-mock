@@ -1,0 +1,6 @@
+{
+  "statusCode": 404,
+  "response": {
+    "error": "User 9 not found"
+  }
+}

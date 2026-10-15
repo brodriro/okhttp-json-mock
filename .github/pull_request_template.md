@@ -20,6 +20,7 @@
 
 - [ ] `./gradlew :okhttp-json-mock:test`
 - [ ] `./gradlew build`
+- [ ] `./gradlew :okhttp-json-mock:publishToMavenLocal && ./gradlew -p consumer-test run`
 - [ ] Sample app run on a device or emulator
 
 ## Breaking changes
@@ -31,4 +32,5 @@
 - [ ] The base branch is `develop` (or `master` for a release)
 - [ ] Commits are atomic and follow `[fix|added|change] Description`
 - [ ] New behaviour is covered by tests
-- [ ] README and changelog are updated when the public API or behaviour changes
+- [ ] README and `CHANGELOG.md` are updated when the public API or behaviour changes
+- [ ] `okhttp-json-mock/api/okhttp-json-mock.api` is updated (`updateKotlinAbi`) when the public API changes

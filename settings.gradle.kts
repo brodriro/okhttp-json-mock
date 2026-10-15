@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "okhttp-json-mock"
 
-include(":app", ":okhttpjsonmock")
+include(":app", ":okhttp-json-mock")

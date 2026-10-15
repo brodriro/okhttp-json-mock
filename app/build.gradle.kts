@@ -1,13 +1,14 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.ktlint)
 }
 
 android {
-    namespace = "ir.mirrajabi.okhttpjsonmock.sample"
+    namespace = "io.github.brodriro.okhttpjsonmock.sample"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "ir.mirrajabi.okhttpjsonmock.sample"
+        applicationId = "io.github.brodriro.okhttpjsonmock.sample"
         minSdk = 23
         targetSdk = 36
         versionCode = 1
@@ -16,7 +17,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Shrunk on purpose: building it runs R8 over the library, which has no keep rules.
+            isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -28,14 +30,13 @@ android {
 }
 
 dependencies {
-    implementation(project(":okhttpjsonmock"))
+    implementation(project(":okhttp-json-mock"))
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
 
     implementation(libs.okhttp)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
-    implementation(libs.retrofit.adapter.rxjava2)
-    implementation(libs.rxjava)
-    implementation(libs.rxandroid)
+    implementation(libs.kotlinx.coroutines.android)
 }
