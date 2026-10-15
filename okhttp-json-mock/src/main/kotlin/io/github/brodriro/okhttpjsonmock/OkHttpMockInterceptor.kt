@@ -29,9 +29,10 @@ import kotlin.random.Random
  * payloads that happen to have a `statusCode` field are left alone.
  * A file or folder named `{id}` matches any value of a path segment, so `users/{id}.json` answers
  * `/users/1` and `/users/42` when there is no file for that exact path.
- * A trailing slash is ignored and the root path `/` is looked up as `index.json`.
+ * A trailing slash is ignored and the root path `/` is looked up as `index`, so `index.json` answers it.
  * The file is returned byte for byte and is expected to be UTF-8.
- * When no file matches, the answer is a 404 whose body lists the files that were tried.
+ * When no file matches, the answer is a 404 whose body lists the exact-path files that were tried and
+ * counts the `{id}` ones.
  *
  * Every call waits before it is answered, to imitate a network: a random time between 500 and
  * 1500 ms unless another window is given. Use [Builder.noDelay] in tests.
@@ -246,14 +247,17 @@ public class OkHttpMockInterceptor private constructor(
 
         /**
          * Simulated latency in `[minMilliseconds, maxMilliseconds)`. Equal bounds give a fixed latency.
-         * Between 500 and 1500 ms when not set.
+         * Between 500 and 1500 ms when not set. A mock that sets `delayMs` waits that long instead.
          */
         public fun delay(minMilliseconds: Int, maxMilliseconds: Int): Builder = apply {
             minDelayMilliseconds = minMilliseconds
             maxDelayMilliseconds = maxMilliseconds
         }
 
-        /** Answers immediately instead of waiting 500 to 1500 ms. Useful in tests. */
+        /**
+         * Answers immediately instead of waiting 500 to 1500 ms, except for mocks that set `delayMs`.
+         * Useful in tests.
+         */
         public fun noDelay(): Builder = delay(0, 0)
 
         /**

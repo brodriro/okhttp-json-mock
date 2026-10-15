@@ -1,6 +1,6 @@
 package io.github.brodriro.okhttpjsonmock
 
-/** Receives one line for every request the interceptor answers. */
+/** Receives one line for every request the interceptor receives. */
 public fun interface MockLogger {
     /** Called with a single-line [message] such as `GET /api/v1/users -> 200 from api/v1/users.json`. */
     public fun log(message: String)
