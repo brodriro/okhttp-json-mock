@@ -142,9 +142,8 @@ test or a mock of the sample app, so they keep working.
 
 Releases are made by the maintainer from `master`: a `vX.Y.Z` tag builds, signs and uploads the
 artifacts to the Maven Central portal, where the maintainer publishes them, and publishes the API
-reference. Pushes to `develop` publish a snapshot
-while the version ends in `-SNAPSHOT`. A published version can never be replaced, so a mistake is
-fixed with a new patch version.
+reference. Pushes to `develop` publish a snapshot while the version ends in `-SNAPSHOT`. A published
+version can never be replaced, so a mistake is fixed with a new patch version.
 
 ## License
 
