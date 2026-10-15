@@ -82,15 +82,16 @@ Requirements:
 - OkHttp 4.12 or newer, including 5.x. The library brings OkHttp 4.12 as an `api` dependency; a newer
   version in your build wins as usual.
 - In Kotlin projects, Kotlin 1.9 or newer. Java projects need nothing else.
+- The library also brings Gson 2.14 (at runtime only, to read wrappers) and the Kotlin standard library.
 
 The API reference of the latest release is at <https://brodriro.github.io/okhttp-json-mock/>.
 
 ## Quick start
 
-**1. Write a mock file.** Its path is the path of the URL plus `.json`:
+**1. Write a mock file**, `app/src/main/assets/api/v1/users/1.json`. Its path is the path of the URL
+plus `.json`:
 
 ```json
-// app/src/main/assets/api/v1/users/1.json
 { "id": 1, "name": "John" }
 ```
 
@@ -170,8 +171,9 @@ Tips:
 - **Keep the mocks out of the release APK** by putting them in `src/debug/assets` instead of
   `src/main/assets`. Android merges that folder only into debug builds. The mocks for a product flavor
   can go in `src/<flavor>/assets` the same way.
-- **Use `addInterceptor`, not `addNetworkInterceptor`.** Network interceptors only run after OkHttp has
-  opened a connection to the server, which is what mocks are meant to avoid.
+- **Use `addInterceptor`, not `addNetworkInterceptor`.** A network interceptor runs only after OkHttp has
+  connected to the server, and since the mock never calls `proceed`, OkHttp fails the call with an
+  `IllegalStateException`.
 - **The base URL is part of the path.** With `baseUrl("https://example.com/mocks/")`, a call to
   `users` is looked up as `mocks/users.json`. The host is never part of it.
 - **Release builds need no keep rules.** The library ships nothing that R8 has to keep; the sample app
@@ -217,7 +219,8 @@ api/v1/users/{id}.delete.json        DELETE /api/v1/users/<any id>
 - A file for the exact path wins over `{id}`, so `users/search.json` and `users/1.json` keep answering
   their own URLs. Adding an `{id}` file never changes the answer of a URL that already had a mock.
 - Up to two segments of a path can be `{id}`, as in `orders/{id}/items/{id}.json`. When several `{id}`
-  files could answer, the one that replaces later segments wins: `users/{id}` before `{id}/1`.
+  files could answer, a file with one `{id}` wins over a file with two, and among those with the same
+  number the one that replaces later segments wins: `users/{id}` before `{id}/1`.
 - The base path you configure is never replaced by `{id}`.
 - Every `{id}` file returns the same content for every id. The value of the id is not inserted into
   the response.
@@ -301,7 +304,7 @@ Good to know:
   `422 Unprocessable Content`, `503 Service Unavailable`. A code without a registered name gets the
   name of its class, such as `Client Error`.
 - **An invalid wrapper fails the call** with an `IOException` that names the file: a `statusCode` out
-  of range, `headers` that is not an object of simple values, or a `delayMs` that is not a whole number
+  of range, `headers` that is not an object of valid header names with simple values, or a `delayMs` that is not a whole number
   from 0 up.
 
 A response with no body:
@@ -375,7 +378,7 @@ The interceptor answers `404 Not Found` with a plain-text body that lists the fi
 No mock file found for GET /api/v1/unknown. Tried: api/v1/unknown.get.json, api/v1/unknown.json and 12 more with {id} in place of a path segment
 ```
 
-The same text goes to the log. In tests you can make this an exception instead: see
+The log line lists the same files. In tests you can make this an exception instead: see
 [Using it in tests](#using-it-in-tests).
 
 ## Using it in tests
@@ -480,7 +483,8 @@ Mocks only for tests can go in `src/test/resources` and be read from the classpa
 | `build()` | | Validates the configuration and throws `IllegalArgumentException` if a value is out of range. |
 
 The interceptor exposes its configuration as read-only properties: `basePath`, `failurePercentage`,
-`failureCode`, `minDelayMilliseconds` and `maxDelayMilliseconds`.
+`failureCode`, `minDelayMilliseconds` and `maxDelayMilliseconds`, plus `recordedCalls` and
+`clearRecordedCalls()` (see [Using it in tests](#using-it-in-tests)).
 
 ### Constructors kept from 3.0
 
@@ -503,8 +507,9 @@ that path. The interceptor closes the stream.
 The contract:
 
 - **Return `null` for a missing file, quickly and without logging.** The interceptor asks for several
-  names per request and most of them do not exist: up to six for a request whose exact file exists, a
-  few dozen for one answered by an `{id}` file or by nothing.
+  names per request and most of them do not exist: up to six for a request whose exact file exists, and
+  from a dozen to over a hundred, depending on the number of path segments and query parameters, for
+  one answered by an `{id}` file or by nothing.
 - **Open exactly the file you are asked for.** Answering an unknown name with some other file breaks
   the order in which mocks are chosen, because the provider is asked for the method files before the
   shared ones. `{id}` files cover the usual reason for doing it.
@@ -620,8 +625,8 @@ api/v1/
     └── 3/phoneNumbers.json
 ```
 
-Run it with `./gradlew :app:installDebug`. The same files are checked by the library's tests, so the
-examples in this README are known to work.
+Run it with `./gradlew :app:installDebug`. The same files are checked by the library's tests
+(`SampleMocksTest`).
 
 ## Troubleshooting
 
@@ -662,8 +667,8 @@ is an object with `statusCode` and no keys other than `statusCode`, `headers`, `
 body itself.
 
 **A call fails with an `IOException` that names a mock file.** The wrapper in that file has a
-`statusCode` that is not a number from 100 to 599, `headers` that is not an object of simple
-values, or a `delayMs` that is not a whole number from 0 up.
+`statusCode` that is not a number from 100 to 599, `headers` that is not an object of valid header
+names with simple values, or a `delayMs` that is not a whole number from 0 up.
 
 **Calls are slow.** Every call waits between 500 and 1500 ms by default to imitate a network. Use
 `delay(min, max)` to change it or `noDelay()` to remove it. A mock with `delayMs` waits that long
@@ -672,8 +677,10 @@ whatever the interceptor says.
 **A test passes although a mock is missing.** By default a missing mock is a 404, which your code
 may handle like any server error. Build the interceptor with `failOnMissingMock()` in tests.
 
-**Requests reach the real server.** The interceptor was added with `addNetworkInterceptor`, to another
-`OkHttpClient` than the one Retrofit uses, or only in a build type you are not running.
+**Requests reach the real server.** The interceptor was added to another `OkHttpClient` than the one
+Retrofit uses, or only in a build type you are not running. (Added with `addNetworkInterceptor`
+instead, every call fails with `IllegalStateException: network interceptor … must call proceed() exactly
+once`.)
 
 ## Migrating from 3.0
 
@@ -686,7 +693,7 @@ may handle like any server error. Build the interceptor with `failOnMissingMock(
    `InputStreamProvider { path -> ... }`.
 
 The constructors of 3.0, such as `new OkHttpMockInterceptor(provider, 5)`, and your existing mock files
-keep working. The default delay is still 500 to 1500 ms per call.
+keep working, except files shaped like a wrapper (see below). The default delay is still 500 to 1500 ms per call.
 
 If your provider does more than open the file it is asked for, check it. For each request it is now
 asked for the method files first (`users/1.get.json`) and then for the shared ones (`users/1.json`).
@@ -701,6 +708,12 @@ Behaviour that changed:
 - A request without a mock answers `404` instead of throwing `IllegalStateException`. If you relied
   on the exception, build the interceptor with `failOnMissingMock()`.
 - A simulated failure has an empty body instead of the contents of the mock.
+- A mock file that is an object with `statusCode` and no keys other than `headers`, `delayMs` and
+  `response` is now read as a wrapper. Rename such a key, or wrap the file, if it was meant as a body.
+- `failurePercentage` outside 0–100 and a minimum delay above the maximum now throw
+  `IllegalArgumentException` when the interceptor is created.
+- The status line carries a standard reason phrase instead of the mock's contents, responses are
+  HTTP/1.1, and the log line has a new format.
 - `ResourcesHelper` was removed.
 - OkHttp 4.12 or newer is required, and Kotlin projects need Kotlin 1.9 or newer.
 
