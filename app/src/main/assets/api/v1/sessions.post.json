@@ -1,0 +1,7 @@
+{
+  "statusCode": 422,
+  "response": {
+    "error": "invalid_credentials",
+    "message": "Email or password is wrong"
+  }
+}

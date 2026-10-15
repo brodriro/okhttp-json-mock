@@ -13,7 +13,7 @@ agreed first.
 
 ## Setting up
 
-You need JDK 17 or newer. The sample app also needs an Android SDK with platform 36, pointed to by
+You need JDK 17 or newer. The sample app also needs an Android SDK with platform 37, pointed to by
 `ANDROID_HOME` or `local.properties`. To work on the library alone you can skip it and use the
 `:okhttp-json-mock` tasks.
 
@@ -42,7 +42,7 @@ okhttp-json-mock/         the library, published to Maven Central
   api/                    recorded public API, checked by the build
   src/main/kotlin/        sources, package io.github.brodriro.okhttpjsonmock
   src/test/kotlin/        JUnit 5 tests
-app/                      Android sample app, uses the library as a project dependency
+app/                      Android sample app (Compose catalog of every feature), uses the library as a project dependency
   src/main/assets/        its mock files, also run by the library's SampleMocksTest
 consumer-test/            separate Gradle build that uses the library from mavenLocal, like a real project
 gradle/libs.versions.toml versions of every dependency and plugin
