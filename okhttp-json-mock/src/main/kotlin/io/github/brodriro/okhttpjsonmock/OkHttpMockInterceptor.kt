@@ -8,6 +8,8 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
+import okio.ByteString
 import java.io.InterruptedIOException
 import kotlin.random.Random
 
@@ -148,6 +150,8 @@ public class OkHttpMockInterceptor private constructor(
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
+        // Read before anything else: the mock never calls proceed, so even a one-shot body is ours to consume.
+        val body = if (recordCalls) bodyOf(request) else null
         val candidates = resolver.candidates(request.method, request.url)
         val match = candidates.firstNotNullOfOrNull { path -> readMock(path)?.let { path to it } }
         val envelope = match
@@ -168,22 +172,22 @@ public class OkHttpMockInterceptor private constructor(
             val explanation = "No mock file found for $call. Tried: $tried"
             if (failOnMissingMock) {
                 logger.log("$call -> failed, no mock found. Tried: $tried")
-                record(request, mockFile = null, statusCode = null)
+                record(request, body, mockFile = null, statusCode = null)
                 throw MissingMockException(request.method, request.url, candidates, explanation)
             }
             logger.log("$call -> $HTTP_NOT_FOUND, no mock found. Tried: $tried")
-            record(request, mockFile = null, statusCode = HTTP_NOT_FOUND)
+            record(request, body, mockFile = null, statusCode = HTTP_NOT_FOUND)
             return response(request, HTTP_NOT_FOUND, explanation.toByteArray(), CONTENT_TYPE_TEXT)
         }
         val (path, mock) = match
         if (Random.nextInt(100) < failurePercentage) {
             logger.log("$call -> $failureCode, simulated failure")
-            record(request, path, failureCode)
+            record(request, body, path, failureCode)
             return response(request, failureCode, ByteArray(0), CONTENT_TYPE_JSON)
         }
         val statusCode = envelope?.statusCode ?: HTTP_OK
         logger.log("$call -> $statusCode from $path")
-        record(request, path, statusCode)
+        record(request, body, path, statusCode)
         return response(
             request,
             statusCode,
@@ -193,9 +197,16 @@ public class OkHttpMockInterceptor private constructor(
         )
     }
 
-    private fun record(request: Request, mockFile: String?, statusCode: Int?) {
+    private fun record(request: Request, body: ByteString?, mockFile: String?, statusCode: Int?) {
         if (!recordCalls) return
-        synchronized(calls) { calls += RecordedCall(request.method, request.url, mockFile, statusCode) }
+        synchronized(calls) { calls += RecordedCall(request.method, request.url, mockFile, statusCode, body) }
+    }
+
+    /** The bytes of the request body, or `null` when there is none or it is duplex and cannot be buffered. */
+    private fun bodyOf(request: Request): ByteString? {
+        val body = request.body ?: return null
+        if (body.isDuplex()) return null
+        return Buffer().also(body::writeTo).readByteString()
     }
 
     private fun extensionOf(path: String): String = path.substringAfterLast('.')
@@ -298,8 +309,9 @@ public class OkHttpMockInterceptor private constructor(
         public fun failOnMissingMock(): Builder = apply { failOnMissingMock = true }
 
         /**
-         * Keeps every request in [OkHttpMockInterceptor.recordedCalls] so a test can check what was
-         * called. Off by default, because the list grows for as long as the interceptor is used.
+         * Keeps every request in [OkHttpMockInterceptor.recordedCalls], body included, so a test can
+         * check what was called and what was sent. Off by default, because the list grows for as long
+         * as the interceptor is used.
          */
         public fun recordCalls(): Builder = apply { recordCalls = true }
 

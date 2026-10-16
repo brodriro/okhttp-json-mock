@@ -210,8 +210,9 @@ object Catalog {
             glyph = "log",
             title = "Recorded calls and log",
             summary = "recordCalls() and MockLogger",
-            description = "recordCalls() keeps every request with the file that answered it and its status. " +
-                "Each call also logs one line through the MockLogger. Both are collected here.",
+            description = "recordCalls() keeps every request with the file that answered it, its status and " +
+                "the body that was sent. Each call also logs one line through the MockLogger. Both are " +
+                "collected here.",
             kind = FeatureKind.CALLS,
         ),
         Feature(

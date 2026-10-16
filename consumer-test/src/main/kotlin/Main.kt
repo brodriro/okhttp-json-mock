@@ -70,6 +70,11 @@ fun main() {
         strict.recordedCalls.map { it.statusCode } == listOf(200, null) && strict.recordedCalls[0].mockFile == "api/v1/users.json",
         "calls are recorded with file and status",
     )
+    strictClient.newCall(Request.Builder().url(url).post("""{"name":"Ana"}""".toRequestBody()).build()).execute().close()
+    check(
+        strict.recordedCalls[0].body == null && strict.recordedCalls[2].body?.utf8() == """{"name":"Ana"}""",
+        "calls are recorded with their body",
+    )
 
     JavaConsumer.run().forEach { (what, ok) -> check(ok, "Java: $what") }
 

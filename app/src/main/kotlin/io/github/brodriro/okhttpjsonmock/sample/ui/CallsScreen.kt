@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.brodriro.okhttpjsonmock.sample.R
 import io.github.brodriro.okhttpjsonmock.sample.SampleViewModel
@@ -81,7 +82,7 @@ fun CallsScreen(feature: Feature, viewModel: SampleViewModel, onBack: () -> Unit
     }
 }
 
-/** One recorded call: `RecordedCall.method`, `url`, `statusCode` and `mockFile`. */
+/** One recorded call: `RecordedCall.method`, `url`, `statusCode`, `mockFile` and the `body` that was sent. */
 @Composable
 private fun CallRow(exchange: Exchange) {
     SampleCard(Modifier.fillMaxWidth()) {
@@ -98,6 +99,15 @@ private fun CallRow(exchange: Exchange) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            exchange.sentBody?.let { sent ->
+                Text(
+                    text = "Sent: ${sent.ifEmpty { "(empty body)" }}",
+                    style = CodeStyle,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("sent-body"),
+                )
+            }
         }
     }
 }

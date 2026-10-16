@@ -6,10 +6,14 @@ import io.github.brodriro.okhttpjsonmock.MissingMockException
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
 import io.github.brodriro.okhttpjsonmock.sample.mock.Playground
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okio.Buffer
+import okio.ByteString.Companion.toByteString
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -185,5 +189,55 @@ class MockFeaturesTest {
         assertEquals("GET /api/v1/ping -> 200 from api/v1/ping.json", lines.first())
         interceptor.clearRecordedCalls()
         assertTrue(interceptor.recordedCalls.isEmpty())
+    }
+
+    private fun OkHttpMockInterceptor.send(method: String, path: String, body: RequestBody?): Response {
+        val request = Request.Builder().url("https://api.example.com/$path").method(method, body).build()
+        return OkHttpClient.Builder().addInterceptor(this).build().newCall(request).execute()
+    }
+
+    @Test
+    fun recordedCallsKeepTheBodyThatWasSent() {
+        val interceptor = builder().build()
+        val json = """{"name":"Ana","age":31}"""
+
+        interceptor.send("POST", "api/v1/users", json.toRequestBody("application/json".toMediaType())).close()
+        interceptor.send("GET", "api/v1/users/1").close()
+        interceptor.send("PUT", "api/v1/users/1", ByteArray(0).toRequestBody()).close()
+
+        val (post, get, put) = interceptor.recordedCalls
+        assertEquals(201, post.statusCode)
+        assertEquals(json, post.body?.utf8())
+        assertNull(get.body)
+        assertEquals(0, put.body?.size)
+    }
+
+    @Test
+    fun recordedCallsKeepABinaryUploadByteForByte() {
+        val interceptor = builder().build()
+        val png = InstrumentationRegistry.getInstrumentation().targetContext.assets
+            .open("api/v1/files/logo.png").use { it.readBytes() }
+        val upload = MultipartBody.Builder("boundary")
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("avatar", "logo.png", png.toRequestBody("image/png".toMediaType()))
+            .build()
+        val expected = Buffer().also(upload::writeTo).readByteString()
+
+        interceptor.send("POST", "api/v1/users", upload).close()
+
+        val body = interceptor.recordedCalls.single().body!!
+        assertEquals(expected, body)
+        assertTrue(body.indexOf(png.toByteString()) > 0)
+    }
+
+    @Test
+    fun aCallThatFailsForAMissingMockKeepsItsBody() {
+        val strict = builder().failOnMissingMock().build()
+
+        assertThrows(MissingMockException::class.java) {
+            strict.send("POST", "api/v1/orders", """{"item":7}""".toRequestBody()).close()
+        }
+
+        assertEquals("""{"item":7}""", strict.recordedCalls.single().body?.utf8())
     }
 }
