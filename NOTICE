@@ -15,5 +15,10 @@ Changes made in this fork since version 3.0:
 - A mock file or folder named {id} answers any value of that path segment.
 - A request without a mock is answered with a 404 instead of an exception.
 - Interceptors are immutable and are configured through a builder, which can
-  also make a missing mock fail and record the calls received, for tests.
+  also make a missing mock fail and record the calls received, with their
+  request bodies, for tests.
+- Mock files can have other extensions than .json and are answered with the
+  Content-Type of their extension.
+- Providers can list their files so that only the file that answers is
+  opened, and providers for the classpath are included.
 - The sample application was rewritten in Kotlin.

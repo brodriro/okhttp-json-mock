@@ -62,11 +62,12 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
   fail with a configurable status. [Latency](#latency), [failures](#simulated-failures)
 - **Clear answers when something is missing:** a 404 that lists the files that were looked for, or an
   exception in tests. [More](#when-no-mock-matches)
-- **Test helpers:** fail on a missing mock, and record which calls were made, with which file and
-  status. [More](#using-it-in-tests)
+- **Test helpers:** fail on a missing mock, and record which calls were made, with which file, which
+  status and which request body. [More](#using-it-in-tests)
 - **Any source of files:** Android assets, the filesystem, classpath resources or a map in memory,
-  through a one-method interface. A provider that can list its files is only asked for the file that
-  answers. [More](#writing-an-inputstreamprovider)
+  through a one-method interface, with built-in providers for the filesystem and the classpath. A
+  provider that can list its files is only asked for the file that answers.
+  [More](#writing-an-inputstreamprovider)
 - **One log line per call**, saying which file answered and with which status. [More](#logging)
 - Written in Kotlin, usable from Java, on Android or any JVM. Immutable and safe to share between
   threads.
@@ -96,8 +97,9 @@ cd okhttp-json-mock
 ./gradlew :app:installDebug
 ```
 
-Every screen is backed by the mock files in [`app/src/main/assets`](app/src/main/assets), so the app is
-also a set of working examples to copy from. [Example](#example) lists what each screen covers.
+Every screen is backed by the mock files in [`app/src/main/assets`](app/src/main/assets) (the classpath
+screen by the Java resources in [`app/src/main/resources`](app/src/main/resources)), so the app is also a
+set of working examples to copy from. [Example](#example) lists what each screen covers.
 
 ## Installation
 
@@ -769,20 +771,24 @@ own interceptor, or its own provider map, since the file for a URL is always the
    reaches the network, the cache or other interceptors added after it.
 2. The method, path and query of the request are turned into the list of candidate files described
    in [the full lookup order](#the-full-lookup-order). Host, headers and body play no part.
-3. The provider is asked for each candidate in turn, and the first one it has is the mock.
+3. The provider is asked for each candidate in turn, and the first one it has is the mock. A provider
+   that [lists its files](#fewer-lookups-a-provider-that-lists-its-files) is only asked for the first
+   candidate in its list.
 4. If the mock is a `.json` wrapper, its status, headers, latency and body are read from it.
 5. The interceptor waits the latency, decides whether the call is a simulated failure, logs one line,
    records the call if asked to, and builds the response with protocol `HTTP/1.1`.
 
 The configuration is immutable and one interceptor can be shared by any number of clients and threads.
-The only state that changes is the list of recorded calls, which is guarded by a lock.
+The only state that changes is the list of recorded calls, which is guarded by a lock, and the list of
+files of a listable provider, read once on the first request.
 
 ## Example
 
 The [sample app](app) is a catalog of every feature of the library, written with Jetpack Compose. Each
 screen explains one feature and sends real requests through an `OkHttpMockInterceptor` that reads the
 mock files in [`app/src/main/assets`](app/src/main/assets), showing the status, the headers, the file
-that answered and the body, with images decoded and PDFs rendered:
+that answered, how many times the provider was asked and the body, with images decoded and PDFs
+rendered:
 
 | Screen | What it shows |
 | --- | --- |
@@ -791,14 +797,16 @@ that answered and the body, with images decoded and PDFs rendered:
 | Paths with ids | `users/{id}.json` for any id, and the exact file winning over it |
 | Status, headers and latency | Wrapped mocks: 201 with `Location`, 204, 404, 422 and a slow mock with `delayMs` |
 | Not only JSON | `extensions(...)` with an image, PDF, SVG, XML, HTML, CSV, text and an unknown extension |
+| Listed mock files | The same requests through the plain assets provider and a `ListableInputStreamProvider`, with the lookups each one costs |
+| Classpath resources | `ClasspathInputStreamProvider` reading the app's Java resources, `{id}` file included |
 | When no mock matches | The 404 that lists the files tried, and `failOnMissingMock()` |
 | Simulated network | Latency, failure percentage and status, strict mode, and ten calls at once |
-| Recorded calls and log | `recordCalls()` and the `MockLogger` lines of the session |
+| Recorded calls and log | `recordCalls()` with the body each call sent, and the `MockLogger` lines of the session |
 | With Retrofit | A typed `UsersService` answered by the same files |
 
 Run it with `./gradlew :app:installDebug`. Its instrumented tests (`app/src/androidTest`) check every
-feature on a device, one test per extension included, and the library's `SampleMocksTest` checks the
-same files on the JVM.
+feature on a device, one test per extension included, and run the Android snippets of this README as
+they are written. The library's `SampleMocksTest` checks the same files on the JVM.
 
 ## Troubleshooting
 
