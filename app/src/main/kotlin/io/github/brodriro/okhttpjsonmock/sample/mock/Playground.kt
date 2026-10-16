@@ -3,6 +3,7 @@ package io.github.brodriro.okhttpjsonmock.sample.mock
 import android.content.res.AssetManager
 import io.github.brodriro.okhttpjsonmock.MockLogger
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
+import io.github.brodriro.okhttpjsonmock.providers.ClasspathInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -36,6 +37,7 @@ enum class Latency(val label: String, val minMillis: Int, val maxMillis: Int) {
  *
  * @property extensions passed to [OkHttpMockInterceptor.Builder.extensions].
  * @property strict sends it with [OkHttpMockInterceptor.Builder.failOnMissingMock] whatever the settings say.
+ * @property source where the interceptor reads the mock files from.
  */
 data class SampleRequest(
     val method: String,
@@ -43,7 +45,18 @@ data class SampleRequest(
     val body: String? = null,
     val extensions: List<String> = listOf("json"),
     val strict: Boolean = false,
+    val source: MockSource = MockSource.ASSETS,
 )
+
+/**
+ * The providers the sample can read mocks with.
+ *
+ * @property basePath passed to [OkHttpMockInterceptor.Builder.basePath]: Java resources live under `mocks/`.
+ */
+enum class MockSource(val basePath: String = "") {
+    ASSETS,
+    CLASSPATH("mocks/"),
+}
 
 /** Builds an interceptor for each request and runs it against the mock files in `assets/`. */
 class Playground(private val assets: AssetManager) {
@@ -57,12 +70,19 @@ class Playground(private val assets: AssetManager) {
         }
     }
 
+    /** The Java resources of the APK (`src/main/resources/mocks`), with the provider built into the library. */
+    private val classpathProvider = ClasspathInputStreamProvider()
+
     fun interceptor(
         settings: NetworkSettings,
         extensions: List<String> = listOf("json"),
         strict: Boolean = false,
         logger: MockLogger = MockLogger.NONE,
-    ): OkHttpMockInterceptor = OkHttpMockInterceptor.Builder(provider)
+        source: MockSource = MockSource.ASSETS,
+    ): OkHttpMockInterceptor = OkHttpMockInterceptor.Builder(
+        if (source == MockSource.CLASSPATH) classpathProvider else provider,
+    )
+        .basePath(source.basePath)
         .delay(settings.latency.minMillis, settings.latency.maxMillis)
         .failurePercentage(settings.failurePercentage)
         .failureCode(settings.failureCode)
@@ -75,7 +95,7 @@ class Playground(private val assets: AssetManager) {
     /** Sends [request] through a fresh interceptor and describes what came back. Never throws. */
     suspend fun send(request: SampleRequest, settings: NetworkSettings): Exchange = withContext(Dispatchers.IO) {
         val logLines = mutableListOf<String>()
-        val interceptor = interceptor(settings, request.extensions, request.strict) { logLines += it }
+        val interceptor = interceptor(settings, request.extensions, request.strict, { logLines += it }, request.source)
         val client = OkHttpClient.Builder().addInterceptor(interceptor).build()
         val body = request.body?.toRequestBody(JSON)
             ?: if (request.method in METHODS_WITH_BODY) "{}".toRequestBody(JSON) else null
