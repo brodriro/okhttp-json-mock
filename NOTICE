@@ -20,5 +20,5 @@ Changes made in this fork since version 3.0:
 - Mock files can have other extensions than .json and are answered with the
   Content-Type of their extension.
 - Providers can list their files so that only the file that answers is
-  opened, and providers for the classpath are included.
+  opened, and a provider for the classpath is included.
 - The sample application was rewritten in Kotlin.

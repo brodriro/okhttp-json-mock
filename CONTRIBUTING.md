@@ -64,7 +64,7 @@ jitpack.yml               build of preview versions on JitPack
 | `ContentTypes.kt` | `Content-Type` of each mock file extension. Internal. |
 | `MockLogger.kt` | The one-line log of each call, with `STDOUT` and `NONE`. |
 | `MissingMockException.kt`, `RecordedCall.kt` | Test options: `failOnMissingMock()` and `recordCalls()`. |
-| `providers/` | `InputStreamProvider`, the extension point; `ListableInputStreamProvider`, for providers that list their files; and the built-in providers for the filesystem (`DefaultInputStreamProvider`) and the classpath (`ClasspathInputStreamProvider`, `ListedClasspathInputStreamProvider`). |
+| `providers/` | `InputStreamProvider`, the extension point; `ListableInputStreamProvider`, for providers that list their files; and the built-in providers for the filesystem (`DefaultInputStreamProvider`) and the classpath (`ClasspathInputStreamProvider`). |
 
 A change to which file answers a request goes in `MockFileResolver` and its test,
 `MockFileResolverTest`. A change to what a mock file can say goes in `MockEnvelope` and
