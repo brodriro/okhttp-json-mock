@@ -27,6 +27,8 @@ android {
 
     buildFeatures {
         compose = true
+        // Only for ReadmeSnippetsTest, which runs the BuildConfig.DEBUG snippet of the README.
+        buildConfig = true
     }
 
     compileOptions {
