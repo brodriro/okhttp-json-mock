@@ -95,9 +95,9 @@ Behaviours that are easy to miss:
 - Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms), or exactly the envelope's `delayMs` when it has one; equal bounds give a fixed delay. The envelope is parsed before the sleep, so an invalid one fails without waiting. An interrupt during the sleep throws `InterruptedIOException`.
 - A plain mock is returned byte for byte as `application/json` (or the type of its extension); an envelope's `response` is re-serialised by Gson (compact, nulls and number text preserved). The status line carries the reason phrase from `ReasonPhrases` (every IANA-registered code with its RFC 9110 name, plus 418; any other code gets its class name, such as `Client Error`).
 - Gson is an `implementation` dependency used only by `MockEnvelope`; files that are not `.json` or do not contain the text `statusCode` are never parsed.
-- The configuration is immutable; the only mutable state is the list of recorded calls. Instances are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
+- The configuration is immutable; the only mutable state is the list of recorded calls. Instances are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which is the only way to set `failureCode`, `logger`, `extensions`, `failOnMissingMock()` and `recordCalls()`, and also has `noDelay()`.
 - Each call logs one line through `MockLogger` (`STDOUT` by default, `NONE` to silence).
-- Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`) throws `IllegalArgumentException` at construction.
+- Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`, an empty `extensions` list or an extension that is not letters and digits) throws `IllegalArgumentException` at construction.
 
 ## Git workflow
 

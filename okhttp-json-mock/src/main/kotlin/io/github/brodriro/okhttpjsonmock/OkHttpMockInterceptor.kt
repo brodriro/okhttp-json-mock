@@ -32,7 +32,7 @@ import kotlin.random.Random
  * A file or folder named `{id}` matches any value of a path segment, so `users/{id}.json` answers
  * `/users/1` and `/users/42` when there is no file for that exact path.
  * A trailing slash is ignored and the root path `/` is looked up as `index`, so `index.json` answers it.
- * The file is returned byte for byte and is expected to be UTF-8.
+ * The file is returned byte for byte; a wrapper is read as UTF-8.
  *
  * Mock files are `.json` unless [Builder.extensions] lists others, such as `xml`, `txt` or `png`. Each
  * file name is then tried with every extension, in that order, and the response gets the

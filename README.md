@@ -62,8 +62,8 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
   fail with a configurable status. [Latency](#latency), [failures](#simulated-failures)
 - **Clear answers when something is missing:** a 404 that lists the files that were looked for, or an
   exception in tests. [More](#when-no-mock-matches)
-- **Test helpers:** fail on a missing mock, and record which calls were made, with which file and
-  status. [More](#using-it-in-tests)
+- **Test helpers:** fail on a missing mock, and record which calls were made, with which file, which
+  status and which request body. [More](#using-it-in-tests)
 - **Any source of files:** Android assets, the filesystem, classpath resources or a map in memory,
   through a one-method interface. [More](#writing-an-inputstreamprovider)
 - **One log line per call**, saying which file answered and with which status. [More](#logging)
@@ -710,12 +710,12 @@ that answered and the body, with images decoded and PDFs rendered:
 | Not only JSON | `extensions(...)` with an image, PDF, SVG, XML, HTML, CSV, text and an unknown extension |
 | When no mock matches | The 404 that lists the files tried, and `failOnMissingMock()` |
 | Simulated network | Latency, failure percentage and status, strict mode, and ten calls at once |
-| Recorded calls and log | `recordCalls()` and the `MockLogger` lines of the session |
+| Recorded calls and log | `recordCalls()` with the body each call sent, and the `MockLogger` lines of the session |
 | With Retrofit | A typed `UsersService` answered by the same files |
 
 Run it with `./gradlew :app:installDebug`. Its instrumented tests (`app/src/androidTest`) check every
-feature on a device, one test per extension included, and the library's `SampleMocksTest` checks the
-same files on the JVM.
+feature on a device, one test per extension included, and run the Android snippets of this README as
+they are written. The library's `SampleMocksTest` checks the same files on the JVM.
 
 ## Troubleshooting
 
