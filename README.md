@@ -21,6 +21,7 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 ## Contents
 
 - [Features](#features)
+- [See it in the demo app](#see-it-in-the-demo-app)
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Android setup](#android-setup)
@@ -68,6 +69,34 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 - **One log line per call**, saying which file answered and with which status. [More](#logging)
 - Written in Kotlin, usable from Java, on Android or any JVM. Immutable and safe to share between
   threads.
+
+## See it in the demo app
+
+The repository ships an Android app that puts every feature in your hands before you add a line to your
+own project. Each screen sends real requests through the interceptor and shows what came back: the
+status, the headers, the mock file that answered and the body, with JSON formatted, images decoded and
+PDFs rendered. Change the latency or the failure rate and watch the next calls follow.
+
+<p align="center">
+  <img src=".github/assets/sample/1-catalog.png" width="24%" alt="Catalog of every feature of the library">
+  <img src=".github/assets/sample/2-responses.png" width="24%" alt="Mocks answering 201 with a Location header and 204 without a body">
+  <img src=".github/assets/sample/3-files.png" width="24%" alt="A PNG mock decoded on the device, with its Content-Type">
+  <img src=".github/assets/sample/4-network-dark.png" width="24%" alt="Simulated network in dark mode: ten calls with 30 % of failures">
+</p>
+
+<p align="center"><sub>Every feature at a glance · status, headers and body per mock · images, PDFs and more
+with <code>extensions(...)</code> · latency and failures you can tune, in light or dark</sub></p>
+
+Try it in a minute, with a device or an emulator connected:
+
+```sh
+git clone https://github.com/brodriro/okhttp-json-mock.git
+cd okhttp-json-mock
+./gradlew :app:installDebug
+```
+
+Every screen is backed by the mock files in [`app/src/main/assets`](app/src/main/assets), so the app is
+also a set of working examples to copy from. [Example](#example) lists what each screen covers.
 
 ## Installation
 
@@ -654,30 +683,26 @@ The only state that changes is the list of recorded calls, which is guarded by a
 
 ## Example
 
-The [sample app](app) reads its mocks from [`app/src/main/assets`](app/src/main/assets). Its screen
-lists the users and shows the result of calling the same resource with POST, PUT, DELETE and a GET that
-answers 404:
+The [sample app](app) is a catalog of every feature of the library, written with Jetpack Compose. Each
+screen explains one feature and sends real requests through an `OkHttpMockInterceptor` that reads the
+mock files in [`app/src/main/assets`](app/src/main/assets), showing the status, the headers, the file
+that answered and the body, with images decoded and PDFs rendered:
 
-```
-api/v1/
-├── users.post.json            POST   /api/v1/users           201 + Location header
-└── users/
-    ├── page=1.json            GET    /api/v1/users?page=1    plain array
-    ├── page=2.get.json        GET    /api/v1/users?page=2    wrapped empty array + header
-    ├── 1.json                 GET    /api/v1/users/1         plain object
-    ├── 1.put.json             PUT    /api/v1/users/1         plain object
-    ├── 1.delete.json          DELETE /api/v1/users/1         204, no body
-    ├── 9.get.json             GET    /api/v1/users/9         404 with an error body
-    ├── {id}.json              GET    /api/v1/users/<any other id>
-    ├── 2.json
-    ├── 3.json
-    ├── 1/phoneNumbers.json    GET    /api/v1/users/1/phoneNumbers
-    ├── 2/phoneNumbers.json
-    └── 3/phoneNumbers.json
-```
+| Screen | What it shows |
+| --- | --- |
+| Paths and queries | Query files, the fallback to the path file, parameters in any order, nested paths |
+| One URL, many methods | `GET`, `PUT`, `DELETE` and `POST` on the same URL, each with its own file |
+| Paths with ids | `users/{id}.json` for any id, and the exact file winning over it |
+| Status, headers and latency | Wrapped mocks: 201 with `Location`, 204, 404, 422 and a slow mock with `delayMs` |
+| Not only JSON | `extensions(...)` with an image, PDF, SVG, XML, HTML, CSV, text and an unknown extension |
+| When no mock matches | The 404 that lists the files tried, and `failOnMissingMock()` |
+| Simulated network | Latency, failure percentage and status, strict mode, and ten calls at once |
+| Recorded calls and log | `recordCalls()` and the `MockLogger` lines of the session |
+| With Retrofit | A typed `UsersService` answered by the same files |
 
-Run it with `./gradlew :app:installDebug`. The same files are checked by the library's tests
-(`SampleMocksTest`).
+Run it with `./gradlew :app:installDebug`. Its instrumented tests (`app/src/androidTest`) check every
+feature on a device, one test per extension included, and the library's `SampleMocksTest` checks the
+same files on the JVM.
 
 ## Troubleshooting
 

@@ -1,0 +1,13 @@
+{
+  "statusCode": 200,
+  "delayMs": 2500,
+  "headers": {
+    "X-Report-Id": "2026-10",
+    "Cache-Control": "no-store"
+  },
+  "response": {
+    "month": "2026-10",
+    "orders": 182,
+    "revenue": "12450.90"
+  }
+}

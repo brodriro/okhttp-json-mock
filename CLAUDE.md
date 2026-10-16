@@ -9,18 +9,19 @@ A small JVM library that mocks HTTP responses for OkHttp/Retrofit: an OkHttp `In
 ## Modules
 
 - `okhttp-json-mock/` — the library. Kotlin (`explicitApi`), Java 8 bytecode, language/API version 2.0 and `kotlin-stdlib` 2.0.21 on purpose (so consumers on Kotlin 1.9+ can read its metadata; do not use newer language features or stdlib APIs), published as `io.github.brodriro:okhttp-json-mock`.
-- `app/` — Android sample app in Kotlin (Retrofit suspend calls, coroutines, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...` and is also exercised by the library's `SampleMocksTest`. It needs no Kotlin plugin: AGP 9 compiles Kotlin on its own.
+- `app/` — Android sample app that consumes the library via `project(":okhttp-json-mock")`: a Jetpack Compose (Material 3) catalog with one screen per feature, each sending requests through the interceptor and showing status, headers, the mock file and the body (images decoded, PDFs rendered). `catalog/Catalog.kt` lists the features and their example requests, `mock/Playground.kt` builds the interceptor and runs them, `ui/` holds the screens, and the Retrofit `UsersService` is kept as one of the features. Its mock data lives in `app/src/main/assets/api/v1/...` and is also exercised by the library's `SampleMocksTest`; its instrumented tests in `app/src/androidTest` (`MockFeaturesTest`, `MockExtensionsTest`, `CatalogUiTest`) check every feature on a device. Kotlin is compiled by AGP 9 itself; the only Kotlin plugin is the Compose compiler one. It compiles against SDK 37 (required by the Compose BOM) and targets 36.
 
 - `consumer-test/` — standalone Gradle build, not included in the root project, that consumes the published artifact from `mavenLocal` from Kotlin and Java. CI runs it against several Kotlin versions.
 
 ## Commands
 
-Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions in `gradle/libs.versions.toml`. Needs JDK 17+ (21 is what is installed locally). `app` also needs an Android SDK (`ANDROID_HOME` or `local.properties`) with platform 36.
+Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions in `gradle/libs.versions.toml`. Needs JDK 17+ (21 is what is installed locally). `app` also needs an Android SDK (`ANDROID_HOME` or `local.properties`) with platform 37.
 
 ```sh
 ./gradlew :okhttp-json-mock:build                # build the library only
 ./gradlew :app:assembleDebug                   # build the sample app
 ./gradlew :app:installDebug                    # install the sample on a connected device
+./gradlew :app:assembleDebugAndroidTest        # build the instrumented tests of the sample (run them on a device)
 ./gradlew :okhttp-json-mock:publishToMavenLocal  # jar + sources + javadoc + pom into ~/.m2
 ```
 
