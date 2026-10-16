@@ -56,7 +56,7 @@ object Catalog {
             summary = "The URL path is the file path",
             description = "A request is answered by the file whose path mirrors its URL. A query string is a " +
                 "file inside the folder of the path, with a fallback to the file for the path and parameters " +
-                "accepted in any order.",
+                "accepted in any order. The root path / is looked up as index.",
             examples = listOf(
                 Example("query", "File for this query", get("api/v1/users?page=1"), "api/v1/users/page=1.json"),
                 Example(
@@ -78,6 +78,8 @@ object Catalog {
                     get("api/v1/users/1/phoneNumbers"),
                     "api/v1/users/1/phoneNumbers.json",
                 ),
+                Example("root", "Root path", get(""), "index.json"),
+                Example("root-post", "Root path, its own POST mock", SampleRequest("POST", ""), "index.post.json"),
             ),
         ),
         Feature(

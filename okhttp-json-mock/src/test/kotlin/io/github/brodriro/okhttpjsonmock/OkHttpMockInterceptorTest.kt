@@ -321,6 +321,32 @@ class OkHttpMockInterceptorTest {
     }
 
     @Test
+    fun `root path can have a mock per method`() {
+        val provider = FakeProvider(mapOf("index.json" to USER, "index.post.json" to USERS))
+        val post = Request.Builder()
+            .url("http://example.com/")
+            .post("{}".toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val get = clientFor(provider).get("http://example.com/")
+        val created = clientFor(provider).newCall(post).execute()
+
+        assertEquals(USER, get.body!!.string())
+        assertEquals(USERS, created.body!!.string())
+        assertEquals("index.post.json", provider.requestedPaths.last())
+    }
+
+    @Test
+    fun `root path with a base path resolves to index inside it`() {
+        val provider = FakeProvider(mapOf("mocks/index.json" to USER))
+
+        val response = clientFor(provider, basePath = "mocks/").get("http://example.com/")
+
+        assertEquals(USER, response.body!!.string())
+        assertEquals(listOf("mocks/index.get.json", "mocks/index.json"), provider.requestedPaths)
+    }
+
+    @Test
     fun `trailing slash resolves to the same file as the path without it`() {
         val provider = FakeProvider(mapOf("api/v1/users.json" to USERS))
 

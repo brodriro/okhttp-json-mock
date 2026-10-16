@@ -57,6 +57,21 @@ class MockFeaturesTest {
     }
 
     @Test
+    fun rootPathIsAnsweredByIndexFiles() {
+        val interceptor = builder().build()
+
+        val root = JSONObject(interceptor.send("GET", "").body!!.string())
+        assertEquals("v1", root.getString("api"))
+        assertEquals("index.json", interceptor.lastMock())
+
+        val accepted = interceptor.send("POST", "")
+        assertEquals(202, accepted.code)
+        assertEquals("/api/v1/jobs/1", accepted.header("Location"))
+        assertEquals(true, JSONObject(accepted.body!!.string()).getBoolean("accepted"))
+        assertEquals("index.post.json", interceptor.lastMock())
+    }
+
+    @Test
     fun eachMethodHasItsOwnMock() {
         val interceptor = builder().build()
 

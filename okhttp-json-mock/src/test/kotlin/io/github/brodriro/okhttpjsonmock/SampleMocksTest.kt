@@ -144,4 +144,14 @@ class SampleMocksTest {
 
         assertEquals(listOf("image/png", "application/pdf", "application/xml"), types)
     }
+
+    @Test
+    fun `the root path is answered by index files, one per method`() {
+        val root = JsonParser.parseString(send("GET", "").body!!.string()).asJsonObject
+        val accepted = send("POST", "")
+
+        assertEquals("v1", root.get("api").asString)
+        assertEquals(202, accepted.code)
+        assertEquals("/api/v1/jobs/1", accepted.header("Location"))
+    }
 }
