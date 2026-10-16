@@ -290,19 +290,4 @@ class MockFeaturesTest {
         assertEquals("classpath", JSONObject(ping.body.decodeToString()).getString("from"))
         assertEquals("mocks/api/v1/users/{id}.json", user.mockFile)
     }
-
-    @Test
-    fun listedClasspathFailsClearlyInAnApkWithoutFolderEntries() {
-        val playground = Playground(InstrumentationRegistry.getInstrumentation().targetContext.assets)
-
-        val ping = runBlocking {
-            playground.send(
-                SampleRequest("GET", "api/v1/ping", source = MockSource.LISTED_CLASSPATH),
-                NetworkSettings(latency = Latency.NONE),
-            )
-        }
-
-        assertNull(ping.statusCode)
-        assertEquals("IOException: No classpath folder named 'mocks'", ping.error)
-    }
 }

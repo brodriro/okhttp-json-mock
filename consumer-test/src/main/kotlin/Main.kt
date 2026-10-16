@@ -4,7 +4,6 @@ import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
 import io.github.brodriro.okhttpjsonmock.providers.ClasspathInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.ListableInputStreamProvider
-import io.github.brodriro.okhttpjsonmock.providers.ListedClasspathInputStreamProvider
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -95,18 +94,17 @@ fun main() {
         )
     }
 
-    listOf(ClasspathInputStreamProvider(), ListedClasspathInputStreamProvider("mocks")).forEach { resources ->
-        val fromClasspath = OkHttpClient.Builder()
-            .addInterceptor(
-                OkHttpMockInterceptor.Builder(resources).basePath("mocks/").noDelay().logger(MockLogger.NONE).build(),
-            )
-            .build()
-        fromClasspath.newCall(Request.Builder().url("http://example.com/api/ping").build()).execute().use {
-            check(
-                it.code == 200 && it.body!!.string().trim() == """{"pong":true}""",
-                "${resources.javaClass.simpleName} serves resources",
-            )
-        }
+    val fromClasspath = OkHttpClient.Builder()
+        .addInterceptor(
+            OkHttpMockInterceptor.Builder(ClasspathInputStreamProvider()).basePath("mocks/").noDelay()
+                .logger(MockLogger.NONE).build(),
+        )
+        .build()
+    fromClasspath.newCall(Request.Builder().url("http://example.com/api/ping").build()).execute().use {
+        check(
+            it.code == 200 && it.body!!.string().trim() == """{"pong":true}""",
+            "ClasspathInputStreamProvider serves resources",
+        )
     }
 
     JavaConsumer.run().forEach { (what, ok) -> check(ok, "Java: $what") }

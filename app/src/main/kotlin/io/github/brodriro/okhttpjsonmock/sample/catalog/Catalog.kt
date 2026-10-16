@@ -228,8 +228,7 @@ object Catalog {
             summary = "ClasspathInputStreamProvider",
             description = "A provider built into the library reads mocks from the classpath: src/test/resources " +
                 "in JVM tests, or the Java resources of a jar or an APK. These examples read the Java resources of " +
-                "this app (src/main/resources/mocks) with basePath(\"mocks/\"). Its listed variant needs folder " +
-                "entries, which an APK does not have, so on Android list the assets instead.",
+                "this app (src/main/resources/mocks) with basePath(\"mocks/\").",
             examples = listOf(
                 Example(
                     "cp-plain",

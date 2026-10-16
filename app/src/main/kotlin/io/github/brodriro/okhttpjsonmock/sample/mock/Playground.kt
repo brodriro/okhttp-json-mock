@@ -6,7 +6,6 @@ import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
 import io.github.brodriro.okhttpjsonmock.providers.ClasspathInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.ListableInputStreamProvider
-import io.github.brodriro.okhttpjsonmock.providers.ListedClasspathInputStreamProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -61,7 +60,6 @@ enum class MockSource(val basePath: String = "") {
     ASSETS,
     LISTED_ASSETS,
     CLASSPATH("mocks/"),
-    LISTED_CLASSPATH("mocks/"),
 }
 
 /** Builds an interceptor for each request and runs it against the mock files in `assets/`. */
@@ -79,18 +77,13 @@ class Playground(private val assets: AssetManager) {
     /** The same assets, listed once so the interceptor only opens the file that answers. */
     val listedProvider = ListedAssets(assets)
 
-    /**
-     * The Java resources of the APK (`src/main/resources/mocks`), with the providers built into the library. The
-     * listed one fails: an APK has no folder entries to find `mocks` with (kept to show it in the tests).
-     */
+    /** The Java resources of the APK (`src/main/resources/mocks`), with the provider built into the library. */
     private val classpathProvider = ClasspathInputStreamProvider()
-    private val listedClasspathProvider = ListedClasspathInputStreamProvider("mocks")
 
     private fun providerFor(source: MockSource): InputStreamProvider = when (source) {
         MockSource.ASSETS -> provider
         MockSource.LISTED_ASSETS -> listedProvider
         MockSource.CLASSPATH -> classpathProvider
-        MockSource.LISTED_CLASSPATH -> listedClasspathProvider
     }
 
     fun interceptor(
