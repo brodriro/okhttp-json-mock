@@ -179,6 +179,43 @@ object Catalog {
             ),
         ),
         Feature(
+            id = "listed",
+            glyph = "ls",
+            title = "Listed mock files",
+            summary = "Fewer lookups with ListableInputStreamProvider",
+            description = "The interceptor tries several names per request and asks the provider for each one. A " +
+                "ListableInputStreamProvider lists its files once, so only the file that answers is opened. Each " +
+                "pair below sends the same request with the plain assets provider and with the listed one.",
+            examples = listOf(
+                Example("id-plain", "{id} file, plain provider", get("api/v1/users/42"), "api/v1/users/{id}.json"),
+                Example(
+                    "id-listed",
+                    "{id} file, listed provider",
+                    SampleRequest("GET", "api/v1/users/42", listed = true),
+                    "api/v1/users/{id}.json",
+                ),
+                Example(
+                    "types-plain",
+                    "14 extensions, plain provider",
+                    SampleRequest("GET", "api/v1/files/manual", extensions = FILE_EXTENSIONS),
+                    "api/v1/files/manual.pdf",
+                ),
+                Example(
+                    "types-listed",
+                    "14 extensions, listed provider",
+                    SampleRequest("GET", "api/v1/files/manual", extensions = FILE_EXTENSIONS, listed = true),
+                    "api/v1/files/manual.pdf",
+                ),
+                Example("none-plain", "No mock, plain provider", get("api/v1/orders/7/items"), "nothing"),
+                Example(
+                    "none-listed",
+                    "No mock, listed provider",
+                    SampleRequest("GET", "api/v1/orders/7/items", listed = true),
+                    "nothing",
+                ),
+            ),
+        ),
+        Feature(
             id = "missing",
             glyph = "404",
             title = "When no mock matches",

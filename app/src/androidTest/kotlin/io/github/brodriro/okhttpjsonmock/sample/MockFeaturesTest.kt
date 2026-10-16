@@ -4,7 +4,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.brodriro.okhttpjsonmock.MissingMockException
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
+import io.github.brodriro.okhttpjsonmock.sample.catalog.Catalog
+import io.github.brodriro.okhttpjsonmock.sample.mock.Latency
+import io.github.brodriro.okhttpjsonmock.sample.mock.ListedAssets
+import io.github.brodriro.okhttpjsonmock.sample.mock.NetworkSettings
 import io.github.brodriro.okhttpjsonmock.sample.mock.Playground
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -239,5 +244,32 @@ class MockFeaturesTest {
         }
 
         assertEquals("""{"item":7}""", strict.recordedCalls.single().body?.utf8())
+    }
+
+    @Test
+    fun listedAssetsContainEveryMockFile() {
+        val listed = ListedAssets(InstrumentationRegistry.getInstrumentation().targetContext.assets).list()
+
+        listOf("index.json", "api/v1/users/{id}.json", "api/v1/users/1/phoneNumbers.json", "api/v1/files/logo.png")
+            .forEach { assertTrue(it, it in listed) }
+    }
+
+    @Test
+    fun everyCatalogRequestIsAnsweredTheSameWithTheListedProvider() {
+        val playground = Playground(InstrumentationRegistry.getInstrumentation().targetContext.assets)
+        val settings = NetworkSettings(latency = Latency.NONE)
+        val requests = Catalog.features.flatMap { feature -> feature.examples.map { it.request } }
+
+        requests.forEach { request ->
+            val plain = runBlocking { playground.send(request.copy(listed = false), settings) }
+            val listed = runBlocking { playground.send(request.copy(listed = true), settings) }
+
+            val what = "${request.method} /${request.path}"
+            assertEquals(what, plain.statusCode, listed.statusCode)
+            assertEquals(what, plain.mockFile, listed.mockFile)
+            assertTrue(what, plain.body.contentEquals(listed.body))
+            assertEquals(what, if (plain.mockFile == null) 0 else 1, listed.providerCalls)
+            assertTrue(what, plain.providerCalls >= listed.providerCalls)
+        }
     }
 }

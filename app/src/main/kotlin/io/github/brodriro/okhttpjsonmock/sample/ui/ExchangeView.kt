@@ -47,12 +47,15 @@ fun ExchangeView(exchange: Exchange, modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        val lookups = "${exchange.providerCalls} provide() call" + if (exchange.providerCalls == 1) "" else "s"
         if (exchange.error != null) {
             CodeBlock(exchange.error, color = MaterialTheme.colorScheme.error)
+            KeyValue("Lookups", lookups)
             return@Column
         }
         Column {
             KeyValue("Mock file", exchange.mockFile ?: "none")
+            KeyValue("Lookups", lookups)
             KeyValue("Content-Type", exchange.contentType ?: "none")
             exchange.headers
                 .filterNot { (name, _) -> name.equals("Content-Type", ignoreCase = true) }

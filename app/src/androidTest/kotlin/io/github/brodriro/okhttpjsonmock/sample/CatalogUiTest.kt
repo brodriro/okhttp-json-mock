@@ -112,6 +112,23 @@ class CatalogUiTest {
     }
 
     @Test
+    fun theListedProviderOpensOnlyTheFileThatAnswers() {
+        open(Catalog.feature("listed"))
+        listOf("id-plain", "id-listed").forEach { id ->
+            compose.onNodeWithTag("feature-screen").performScrollToNode(hasTestTag("example-$id"))
+            compose.onNodeWithTag("send-$id").performClick()
+            val answered = hasAnyAncestor(hasTestTag("example-$id")) and hasText("api/v1/users/{id}.json")
+            compose.waitUntilAtLeastOneExists(answered, 10_000)
+        }
+
+        val oneLookup = hasText("1 provide() call")
+        compose.onNode(hasAnyAncestor(hasTestTag("example-id-listed")) and oneLookup, useUnmergedTree = true)
+            .assertExists()
+        compose.onNode(hasAnyAncestor(hasTestTag("example-id-plain")) and oneLookup, useUnmergedTree = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
     fun retrofitServiceRunsOnTheMocks() {
         open(Catalog.feature("retrofit"))
         compose.onNodeWithTag("run-retrofit").performClick()

@@ -20,6 +20,7 @@ import java.io.IOException
  * @property mockFile the file that answered, from [io.github.brodriro.okhttpjsonmock.RecordedCall.mockFile].
  * @property sentBody the request body as the interceptor recorded it, from
  * [io.github.brodriro.okhttpjsonmock.RecordedCall.body], or `null` when the request had none.
+ * @property providerCalls how many times the interceptor called `provide` for this request.
  * @property log the lines the interceptor logged through its `MockLogger`.
  */
 class Exchange(
@@ -33,6 +34,7 @@ class Exchange(
     val mockFile: String?,
     val sentBody: String?,
     val elapsedMillis: Long,
+    val providerCalls: Int,
     val error: String?,
     val log: List<String>,
 )
