@@ -1,7 +1,9 @@
 import io.github.brodriro.okhttpjsonmock.MockLogger;
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor;
+import io.github.brodriro.okhttpjsonmock.providers.ClasspathInputStreamProvider;
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider;
 import io.github.brodriro.okhttpjsonmock.providers.ListableInputStreamProvider;
+import io.github.brodriro.okhttpjsonmock.providers.ListedClasspathInputStreamProvider;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -73,6 +75,18 @@ public final class JavaConsumer {
         try (Response response = indexed.newCall(request).execute()) {
             results.put("listable provider", response.code() == 200
                 && opened.equals(Collections.singletonList("api/v1/users.json")));
+        }
+        Request ping = new Request.Builder().url("http://example.com/api/ping").build();
+        for (InputStreamProvider resources : new InputStreamProvider[] {
+            new ClasspathInputStreamProvider(), new ListedClasspathInputStreamProvider("mocks"),
+        }) {
+            OkHttpClient fromClasspath = new OkHttpClient.Builder()
+                .addInterceptor(new OkHttpMockInterceptor.Builder(resources).basePath("mocks/").noDelay()
+                    .logger(MockLogger.NONE).build())
+                .build();
+            try (Response response = fromClasspath.newCall(ping).execute()) {
+                results.put(resources.getClass().getSimpleName(), response.code() == 200);
+            }
         }
         return results;
     }

@@ -55,6 +55,13 @@ public final class io/github/brodriro/okhttpjsonmock/RecordedCall {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/brodriro/okhttpjsonmock/providers/ClasspathInputStreamProvider : io/github/brodriro/okhttpjsonmock/providers/InputStreamProvider {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/ClassLoader;)V
+	public synthetic fun <init> (Ljava/lang/ClassLoader;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun provide (Ljava/lang/String;)Ljava/io/InputStream;
+}
+
 public final class io/github/brodriro/okhttpjsonmock/providers/DefaultInputStreamProvider : io/github/brodriro/okhttpjsonmock/providers/InputStreamProvider {
 	public fun <init> ()V
 	public fun provide (Ljava/lang/String;)Ljava/io/InputStream;
@@ -66,5 +73,14 @@ public abstract interface class io/github/brodriro/okhttpjsonmock/providers/Inpu
 
 public abstract interface class io/github/brodriro/okhttpjsonmock/providers/ListableInputStreamProvider : io/github/brodriro/okhttpjsonmock/providers/InputStreamProvider {
 	public abstract fun list ()Ljava/util/Collection;
+}
+
+public final class io/github/brodriro/okhttpjsonmock/providers/ListedClasspathInputStreamProvider : io/github/brodriro/okhttpjsonmock/providers/ListableInputStreamProvider {
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/ClassLoader;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/ClassLoader;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getRoot ()Ljava/lang/String;
+	public fun list ()Ljava/util/Collection;
+	public fun provide (Ljava/lang/String;)Ljava/io/InputStream;
 }
 

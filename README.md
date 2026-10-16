@@ -555,8 +555,17 @@ OkHttpMockInterceptor.Builder(DefaultInputStreamProvider())
     .build()
 ```
 
-Mocks only for tests can go in `src/test/resources` and be read from the classpath: see
-[Writing an InputStreamProvider](#writing-an-inputstreamprovider).
+Mocks only for tests can go in `src/test/resources` and be read from the classpath with the built-in
+provider:
+
+```kotlin
+OkHttpMockInterceptor.Builder(ClasspathInputStreamProvider())
+    .basePath("mocks/")             // src/test/resources/mocks/...
+    .noDelay()
+    .build()
+```
+
+See [Writing an InputStreamProvider](#writing-an-inputstreamprovider) for the listed variant.
 
 ## Configuration reference
 
@@ -624,11 +633,12 @@ val assets = InputStreamProvider { path ->
 }
 ```
 
-Classpath resources, for example `src/test/resources`. `getResourceAsStream` already returns `null` for
-a missing file:
+Classpath resources, for example `src/test/resources` or the resources of a jar: the built-in
+`ClasspathInputStreamProvider()`, which uses the class loader of the library or the one it is given.
+Paths are resource names, so a folder of mocks goes in `basePath`:
 
 ```kotlin
-val resources = InputStreamProvider { path -> javaClass.classLoader.getResourceAsStream(path) }
+OkHttpMockInterceptor.Builder(ClasspathInputStreamProvider()).basePath("mocks/").build()
 ```
 
 Files in memory:
@@ -694,6 +704,21 @@ What to keep in mind:
   returns `null` for a listed file, the next name is tried.
 - **If `list()` throws**, that request fails with the exception and the next request calls it again.
 - **Java** implements both methods, as with any interface of two methods.
+
+Classpath resources come listed with the built-in `ListedClasspathInputStreamProvider(root)`. It finds
+the folder `root` with the class loader and walks it, on disk (`src/test/resources/mocks` in a Gradle
+build) or inside a jar, in every place of the classpath where it appears:
+
+```kotlin
+OkHttpMockInterceptor.Builder(ListedClasspathInputStreamProvider("mocks")).basePath("mocks/").build()
+```
+
+Only files under `root` are served, so `basePath` must start with it. Its `list()` fails with an
+`IOException`, which fails the request, when the folder is not on the classpath or cannot be walked: a
+class loader that exposes neither files nor jars, or a jar built without folder entries. Gradle and Maven
+add those entries, and `ClasspathInputStreamProvider` works without them. An Android APK has none, so
+in an app the listed variant fails: list the [assets](#fewer-lookups-a-provider-that-lists-its-files)
+instead, or use the plain `ClasspathInputStreamProvider`, which reads Java resources from an APK too.
 
 ## Recipes
 

@@ -1,8 +1,10 @@
 import io.github.brodriro.okhttpjsonmock.MissingMockException
 import io.github.brodriro.okhttpjsonmock.MockLogger
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
+import io.github.brodriro.okhttpjsonmock.providers.ClasspathInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.ListableInputStreamProvider
+import io.github.brodriro.okhttpjsonmock.providers.ListedClasspathInputStreamProvider
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -91,6 +93,20 @@ fun main() {
             it.code == 200 && opened == listOf("api/v1/users/{id}.json"),
             "a listable provider is only asked for the file that answers",
         )
+    }
+
+    listOf(ClasspathInputStreamProvider(), ListedClasspathInputStreamProvider("mocks")).forEach { resources ->
+        val fromClasspath = OkHttpClient.Builder()
+            .addInterceptor(
+                OkHttpMockInterceptor.Builder(resources).basePath("mocks/").noDelay().logger(MockLogger.NONE).build(),
+            )
+            .build()
+        fromClasspath.newCall(Request.Builder().url("http://example.com/api/ping").build()).execute().use {
+            check(
+                it.code == 200 && it.body!!.string().trim() == """{"pong":true}""",
+                "${resources.javaClass.simpleName} serves resources",
+            )
+        }
     }
 
     JavaConsumer.run().forEach { (what, ok) -> check(ok, "Java: $what") }

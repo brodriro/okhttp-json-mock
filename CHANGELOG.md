@@ -21,6 +21,9 @@ released by this fork as `io.github.brodriro:okhttp-json-mock`.
   and the interceptor then asks it only for the file that answers, instead of one call per name it
   tries. Answers do not change. `DefaultInputStreamProvider` does not list, so the filesystem keeps
   seeing files added at any time.
+- Built-in classpath providers: `ClasspathInputStreamProvider()` reads mocks from the classpath
+  (`src/test/resources`, jars) and `ListedClasspathInputStreamProvider(root)` also lists the folder
+  `root`, on disk or inside a jar, so only the file that answers is opened.
 
 ## 4.0.0
 
