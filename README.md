@@ -21,6 +21,7 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 ## Contents
 
 - [Features](#features)
+- [See it in the demo app](#see-it-in-the-demo-app)
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Android setup](#android-setup)
@@ -68,6 +69,34 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 - **One log line per call**, saying which file answered and with which status. [More](#logging)
 - Written in Kotlin, usable from Java, on Android or any JVM. Immutable and safe to share between
   threads.
+
+## See it in the demo app
+
+The repository ships an Android app that puts every feature in your hands before you add a line to your
+own project. Each screen sends real requests through the interceptor and shows what came back: the
+status, the headers, the mock file that answered and the body, with JSON formatted, images decoded and
+PDFs rendered. Change the latency or the failure rate and watch the next calls follow.
+
+<p align="center">
+  <img src=".github/assets/sample/1-catalog.png" width="24%" alt="Catalog of every feature of the library">
+  <img src=".github/assets/sample/2-responses.png" width="24%" alt="Mocks answering 201 with a Location header and 204 without a body">
+  <img src=".github/assets/sample/3-files.png" width="24%" alt="A PNG mock decoded on the device, with its Content-Type">
+  <img src=".github/assets/sample/4-network-dark.png" width="24%" alt="Simulated network in dark mode: ten calls with 30 % of failures">
+</p>
+
+<p align="center"><sub>Every feature at a glance · status, headers and body per mock · images, PDFs and more
+with <code>extensions(...)</code> · latency and failures you can tune, in light or dark</sub></p>
+
+Try it in a minute, with a device or an emulator connected:
+
+```sh
+git clone https://github.com/brodriro/okhttp-json-mock.git
+cd okhttp-json-mock
+./gradlew :app:installDebug
+```
+
+Every screen is backed by the mock files in [`app/src/main/assets`](app/src/main/assets), so the app is
+also a set of working examples to copy from. [Example](#example) lists what each screen covers.
 
 ## Installation
 
