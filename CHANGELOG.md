@@ -14,6 +14,9 @@ released by this fork as `io.github.brodriro:okhttp-json-mock`.
   files, tried in that order for each file name, and the response gets the `Content-Type` of the
   extension that matched. Only `.json` files are read as wrappers. The configured list can be read back
   as `extensions`. Without it only `.json` files are looked up, as before.
+- The body of each recorded request: `RecordedCall.body` is the request body as it was sent, as an
+  Okio `ByteString` (`body?.utf8()` for text), or `null` when the request had none or it is duplex. It
+  is only read when `recordCalls()` is set.
 
 ## 4.0.0
 

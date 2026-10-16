@@ -4,11 +4,19 @@ import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okio.Buffer
+import okio.BufferedSink
+import okio.ByteString
+import okio.ByteString.Companion.encodeUtf8
+import okio.ByteString.Companion.toByteString
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -202,5 +210,142 @@ class TestingOptionsTest {
 
         assertEquals(404, clientFor(interceptor).send("GET", "http://example.com/unknown").code)
         assertTrue(interceptor.recordedCalls.isEmpty())
+    }
+
+    private fun OkHttpClient.send(method: String, url: String, body: RequestBody?): Response =
+        newCall(Request.Builder().url(url).method(method, body).build()).execute()
+
+    /** A body that counts how many times it was written and can be one-shot or duplex. */
+    private class CountingBody(
+        private val bytes: ByteString,
+        private val oneShot: Boolean = false,
+        private val duplex: Boolean = false,
+    ) : RequestBody() {
+        var writes = 0
+
+        override fun contentType(): MediaType = "application/octet-stream".toMediaType()
+
+        override fun isOneShot(): Boolean = oneShot
+
+        override fun isDuplex(): Boolean = duplex
+
+        override fun writeTo(sink: BufferedSink) {
+            check(!oneShot || writes == 0) { "one-shot body written twice" }
+            writes++
+            sink.write(bytes)
+        }
+    }
+
+    @Test
+    fun `the body of a request is recorded as it was sent`() {
+        val interceptor = builder().recordCalls().build()
+        val json = """{"name":"Ana","age":30}"""
+
+        clientFor(interceptor).send(
+            "POST",
+            "http://example.com/api/v1/users",
+            json.toRequestBody("application/json".toMediaType()),
+        )
+
+        val call = interceptor.recordedCalls.single()
+        assertEquals(json.encodeUtf8(), call.body)
+        assertEquals(json, call.body?.utf8())
+    }
+
+    @Test
+    fun `a request without body is recorded with a null body`() {
+        val interceptor = builder().recordCalls().build()
+
+        clientFor(interceptor).send("GET", "http://example.com/api/v1/users")
+
+        assertNull(interceptor.recordedCalls.single().body)
+    }
+
+    @Test
+    fun `an empty body is recorded as an empty ByteString`() {
+        val interceptor = builder().recordCalls().build()
+
+        clientFor(interceptor).send("POST", "http://example.com/api/v1/users", ByteArray(0).toRequestBody())
+
+        assertEquals(ByteString.EMPTY, interceptor.recordedCalls.single().body)
+    }
+
+    @Test
+    fun `a binary multipart body is recorded byte for byte`() {
+        val interceptor = builder().recordCalls().build()
+        val image = ByteArray(256) { it.toByte() }
+        val multipart = MultipartBody.Builder("boundary")
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("name", "Ana")
+            .addFormDataPart("avatar", "avatar.png", image.toRequestBody("image/png".toMediaType()))
+            .build()
+        val expected = Buffer().also(multipart::writeTo).readByteString()
+
+        clientFor(interceptor).send("POST", "http://example.com/api/v1/users", multipart)
+
+        val body = interceptor.recordedCalls.single().body!!
+        assertEquals(expected, body)
+        assertTrue(body.indexOf(image.toByteString()) > 0)
+    }
+
+    @Test
+    fun `a one-shot body is read once and the call is still answered`() {
+        val interceptor = builder().recordCalls().build()
+        val body = CountingBody("payload".encodeUtf8(), oneShot = true)
+
+        val response = clientFor(interceptor).send("POST", "http://example.com/api/v1/users", body)
+
+        assertEquals(201, response.code)
+        assertEquals(1, body.writes)
+        assertEquals("payload", interceptor.recordedCalls.single().body?.utf8())
+    }
+
+    @Test
+    fun `a duplex body is not read and is recorded as null`() {
+        val interceptor = builder().recordCalls().build()
+        val body = CountingBody("stream".encodeUtf8(), duplex = true)
+
+        clientFor(interceptor).send("POST", "http://example.com/api/v1/users", body)
+
+        assertEquals(0, body.writes)
+        assertNull(interceptor.recordedCalls.single().body)
+    }
+
+    @Test
+    fun `the body is not read unless recordCalls is set`() {
+        val body = CountingBody("payload".encodeUtf8())
+
+        clientFor(builder().build()).send("POST", "http://example.com/api/v1/users", body)
+
+        assertEquals(0, body.writes)
+    }
+
+    @Test
+    fun `the body is recorded for missing mocks and simulated failures too`() {
+        val strict = builder().recordCalls().failOnMissingMock().build()
+        assertFailsWith<MissingMockException> {
+            clientFor(strict).send("PUT", "http://example.com/unknown", "a".toRequestBody())
+        }
+        assertEquals("a", strict.recordedCalls.single().body?.utf8())
+
+        val lenient = builder().recordCalls().build()
+        clientFor(lenient).send("PUT", "http://example.com/unknown", "b".toRequestBody())
+        assertEquals("b", lenient.recordedCalls.single().body?.utf8())
+
+        val failing = builder().recordCalls().failurePercentage(100).build()
+        clientFor(failing).send("POST", "http://example.com/api/v1/users", "c".toRequestBody())
+        assertEquals("c", failing.recordedCalls.single().body?.utf8())
+    }
+
+    @Test
+    fun `the body does not appear in toString`() {
+        val interceptor = builder().recordCalls().build()
+
+        clientFor(interceptor).send("POST", "http://example.com/api/v1/users", "secret".toRequestBody())
+
+        assertEquals(
+            "POST http://example.com/api/v1/users -> 201 from api/v1/users.post.json",
+            interceptor.recordedCalls.single().toString(),
+        )
     }
 }

@@ -500,6 +500,7 @@ class UserRepositoryTest {
         assertEquals("/api/v1/users", call.url.encodedPath)
         assertEquals(201, call.statusCode)
         assertEquals("api/v1/users.post.json", call.mockFile)
+        assertEquals("""{"name":"Ana"}""", call.body?.utf8())
     }
 }
 ```
@@ -526,8 +527,20 @@ Recording is off by default because the list grows for as long as the intercepto
 | `url` | `HttpUrl` of the request, with its query. |
 | `mockFile` | The file that answered, with the `basePath` in front, or `null` when none matched. |
 | `statusCode` | The status of the answer, a simulated failure's included, or `null` when the call failed with `MissingMockException`. |
+| `body` | The request body as it was sent, as an Okio `ByteString`, or `null` when the request had none. |
 
-The request body and headers are not recorded.
+The body lets a test check what was sent and not only where. `ByteString` comes with OkHttp, keeps
+binary bodies byte for byte and compares by content:
+
+```kotlin
+val call = interceptor.recordedCalls.single()
+assertEquals("""{"name":"Ana"}""", call.body?.utf8())        // the text, for JSON or forms
+assertEquals(expectedBytes.toByteString(), call.body)          // the exact bytes, for binaries
+```
+
+An empty body is `ByteString.EMPTY`. A duplex body (`isDuplex()`) cannot be read without consuming the
+call, so it is recorded as `null`. The body is only read when `recordCalls()` is set, and every recorded
+call keeps it in memory. The request headers are not recorded.
 
 **Reusing the app's mocks in unit tests.** Gradle runs unit tests from the module folder, so the
 filesystem provider can read the same files the app uses:

@@ -47,6 +47,7 @@ public final class io/github/brodriro/okhttpjsonmock/OkHttpMockInterceptor$Build
 }
 
 public final class io/github/brodriro/okhttpjsonmock/RecordedCall {
+	public final fun getBody ()Lokio/ByteString;
 	public final fun getMethod ()Ljava/lang/String;
 	public final fun getMockFile ()Ljava/lang/String;
 	public final fun getStatusCode ()Ljava/lang/Integer;
