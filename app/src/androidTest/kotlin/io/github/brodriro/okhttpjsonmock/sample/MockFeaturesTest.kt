@@ -7,8 +7,10 @@ import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
 import io.github.brodriro.okhttpjsonmock.sample.catalog.Catalog
 import io.github.brodriro.okhttpjsonmock.sample.mock.Latency
 import io.github.brodriro.okhttpjsonmock.sample.mock.ListedAssets
+import io.github.brodriro.okhttpjsonmock.sample.mock.MockSource
 import io.github.brodriro.okhttpjsonmock.sample.mock.NetworkSettings
 import io.github.brodriro.okhttpjsonmock.sample.mock.Playground
+import io.github.brodriro.okhttpjsonmock.sample.mock.SampleRequest
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -259,10 +261,11 @@ class MockFeaturesTest {
         val playground = Playground(InstrumentationRegistry.getInstrumentation().targetContext.assets)
         val settings = NetworkSettings(latency = Latency.NONE)
         val requests = Catalog.features.flatMap { feature -> feature.examples.map { it.request } }
+            .filter { it.source == MockSource.ASSETS || it.source == MockSource.LISTED_ASSETS }
 
         requests.forEach { request ->
-            val plain = runBlocking { playground.send(request.copy(listed = false), settings) }
-            val listed = runBlocking { playground.send(request.copy(listed = true), settings) }
+            val plain = runBlocking { playground.send(request.copy(source = MockSource.ASSETS), settings) }
+            val listed = runBlocking { playground.send(request.copy(source = MockSource.LISTED_ASSETS), settings) }
 
             val what = "${request.method} /${request.path}"
             assertEquals(what, plain.statusCode, listed.statusCode)
@@ -271,5 +274,35 @@ class MockFeaturesTest {
             assertEquals(what, if (plain.mockFile == null) 0 else 1, listed.providerCalls)
             assertTrue(what, plain.providerCalls >= listed.providerCalls)
         }
+    }
+
+    @Test
+    fun classpathProviderReadsTheJavaResourcesOfTheApk() {
+        val playground = Playground(InstrumentationRegistry.getInstrumentation().targetContext.assets)
+        val settings = NetworkSettings(latency = Latency.NONE)
+        val source = MockSource.CLASSPATH
+
+        val ping = runBlocking { playground.send(SampleRequest("GET", "api/v1/ping", source = source), settings) }
+        val user = runBlocking { playground.send(SampleRequest("GET", "api/v1/users/42", source = source), settings) }
+
+        assertEquals(ping.error, 200, ping.statusCode)
+        assertEquals("mocks/api/v1/ping.json", ping.mockFile)
+        assertEquals("classpath", JSONObject(ping.body.decodeToString()).getString("from"))
+        assertEquals("mocks/api/v1/users/{id}.json", user.mockFile)
+    }
+
+    @Test
+    fun listedClasspathFailsClearlyInAnApkWithoutFolderEntries() {
+        val playground = Playground(InstrumentationRegistry.getInstrumentation().targetContext.assets)
+
+        val ping = runBlocking {
+            playground.send(
+                SampleRequest("GET", "api/v1/ping", source = MockSource.LISTED_CLASSPATH),
+                NetworkSettings(latency = Latency.NONE),
+            )
+        }
+
+        assertNull(ping.statusCode)
+        assertEquals("IOException: No classpath folder named 'mocks'", ping.error)
     }
 }

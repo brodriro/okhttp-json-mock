@@ -3,8 +3,10 @@ package io.github.brodriro.okhttpjsonmock.sample.mock
 import android.content.res.AssetManager
 import io.github.brodriro.okhttpjsonmock.MockLogger
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
+import io.github.brodriro.okhttpjsonmock.providers.ClasspathInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.ListableInputStreamProvider
+import io.github.brodriro.okhttpjsonmock.providers.ListedClasspathInputStreamProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -39,8 +41,7 @@ enum class Latency(val label: String, val minMillis: Int, val maxMillis: Int) {
  *
  * @property extensions passed to [OkHttpMockInterceptor.Builder.extensions].
  * @property strict sends it with [OkHttpMockInterceptor.Builder.failOnMissingMock] whatever the settings say.
- * @property listed reads the assets through [ListedAssets], a `ListableInputStreamProvider`, instead of
- *   [Playground.provider].
+ * @property source where the interceptor reads the mock files from.
  */
 data class SampleRequest(
     val method: String,
@@ -48,8 +49,20 @@ data class SampleRequest(
     val body: String? = null,
     val extensions: List<String> = listOf("json"),
     val strict: Boolean = false,
-    val listed: Boolean = false,
+    val source: MockSource = MockSource.ASSETS,
 )
+
+/**
+ * The providers the sample can read mocks with.
+ *
+ * @property basePath passed to [OkHttpMockInterceptor.Builder.basePath]: Java resources live under `mocks/`.
+ */
+enum class MockSource(val basePath: String = "") {
+    ASSETS,
+    LISTED_ASSETS,
+    CLASSPATH("mocks/"),
+    LISTED_CLASSPATH("mocks/"),
+}
 
 /** Builds an interceptor for each request and runs it against the mock files in `assets/`. */
 class Playground(private val assets: AssetManager) {
@@ -66,13 +79,29 @@ class Playground(private val assets: AssetManager) {
     /** The same assets, listed once so the interceptor only opens the file that answers. */
     val listedProvider = ListedAssets(assets)
 
+    /**
+     * The Java resources of the APK (`src/main/resources/mocks`), with the providers built into the library. The
+     * listed one fails: an APK has no folder entries to find `mocks` with (kept to show it in the tests).
+     */
+    private val classpathProvider = ClasspathInputStreamProvider()
+    private val listedClasspathProvider = ListedClasspathInputStreamProvider("mocks")
+
+    private fun providerFor(source: MockSource): InputStreamProvider = when (source) {
+        MockSource.ASSETS -> provider
+        MockSource.LISTED_ASSETS -> listedProvider
+        MockSource.CLASSPATH -> classpathProvider
+        MockSource.LISTED_CLASSPATH -> listedClasspathProvider
+    }
+
     fun interceptor(
         settings: NetworkSettings,
         provider: InputStreamProvider = this.provider,
         extensions: List<String> = listOf("json"),
         strict: Boolean = false,
+        basePath: String = "",
         logger: MockLogger = MockLogger.NONE,
     ): OkHttpMockInterceptor = OkHttpMockInterceptor.Builder(provider)
+        .basePath(basePath)
         .delay(settings.latency.minMillis, settings.latency.maxMillis)
         .failurePercentage(settings.failurePercentage)
         .failureCode(settings.failureCode)
@@ -86,8 +115,10 @@ class Playground(private val assets: AssetManager) {
     suspend fun send(request: SampleRequest, settings: NetworkSettings): Exchange = withContext(Dispatchers.IO) {
         val logLines = mutableListOf<String>()
         val providerCalls = AtomicInteger()
-        val counted = counting(if (request.listed) listedProvider else provider, providerCalls)
-        val interceptor = interceptor(settings, counted, request.extensions, request.strict) { logLines += it }
+        val counted = counting(providerFor(request.source), providerCalls)
+        val interceptor = interceptor(settings, counted, request.extensions, request.strict, request.source.basePath) {
+            logLines += it
+        }
         val client = OkHttpClient.Builder().addInterceptor(interceptor).build()
         val body = request.body?.toRequestBody(JSON)
             ?: if (request.method in METHODS_WITH_BODY) "{}".toRequestBody(JSON) else null

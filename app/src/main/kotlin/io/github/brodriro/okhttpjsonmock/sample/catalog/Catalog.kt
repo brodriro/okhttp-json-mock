@@ -1,5 +1,6 @@
 package io.github.brodriro.okhttpjsonmock.sample.catalog
 
+import io.github.brodriro.okhttpjsonmock.sample.mock.MockSource
 import io.github.brodriro.okhttpjsonmock.sample.mock.SampleRequest
 
 /** What a feature screen shows besides its description. */
@@ -191,7 +192,7 @@ object Catalog {
                 Example(
                     "id-listed",
                     "{id} file, listed provider",
-                    SampleRequest("GET", "api/v1/users/42", listed = true),
+                    SampleRequest("GET", "api/v1/users/42", source = MockSource.LISTED_ASSETS),
                     "api/v1/users/{id}.json",
                 ),
                 Example(
@@ -203,15 +204,44 @@ object Catalog {
                 Example(
                     "types-listed",
                     "14 extensions, listed provider",
-                    SampleRequest("GET", "api/v1/files/manual", extensions = FILE_EXTENSIONS, listed = true),
+                    SampleRequest(
+                        "GET",
+                        "api/v1/files/manual",
+                        extensions = FILE_EXTENSIONS,
+                        source = MockSource.LISTED_ASSETS,
+                    ),
                     "api/v1/files/manual.pdf",
                 ),
                 Example("none-plain", "No mock, plain provider", get("api/v1/orders/7/items"), "nothing"),
                 Example(
                     "none-listed",
                     "No mock, listed provider",
-                    SampleRequest("GET", "api/v1/orders/7/items", listed = true),
+                    SampleRequest("GET", "api/v1/orders/7/items", source = MockSource.LISTED_ASSETS),
                     "nothing",
+                ),
+            ),
+        ),
+        Feature(
+            id = "classpath",
+            glyph = "cp",
+            title = "Classpath resources",
+            summary = "ClasspathInputStreamProvider",
+            description = "A provider built into the library reads mocks from the classpath: src/test/resources " +
+                "in JVM tests, or the Java resources of a jar or an APK. These examples read the Java resources of " +
+                "this app (src/main/resources/mocks) with basePath(\"mocks/\"). Its listed variant needs folder " +
+                "entries, which an APK does not have, so on Android list the assets instead.",
+            examples = listOf(
+                Example(
+                    "cp-plain",
+                    "ClasspathInputStreamProvider",
+                    SampleRequest("GET", "api/v1/ping", source = MockSource.CLASSPATH),
+                    "mocks/api/v1/ping.json",
+                ),
+                Example(
+                    "cp-id",
+                    "ClasspathInputStreamProvider, {id} file",
+                    SampleRequest("GET", "api/v1/users/42", source = MockSource.CLASSPATH),
+                    "mocks/api/v1/users/{id}.json",
                 ),
             ),
         ),
