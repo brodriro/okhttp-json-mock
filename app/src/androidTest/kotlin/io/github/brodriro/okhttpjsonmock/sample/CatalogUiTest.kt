@@ -1,10 +1,12 @@
 package io.github.brodriro.okhttpjsonmock.sample
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -90,6 +92,23 @@ class CatalogUiTest {
         compose.onNodeWithText("Calls (10)").assertExists()
         compose.onNodeWithContentDescription("Clear the history").performClick()
         compose.onNodeWithText("Calls (0)").assertExists()
+    }
+
+    @Test
+    fun recordedCallsShowTheBodyThatWasSent() {
+        open(Catalog.feature("methods"))
+        mapOf("post" to "api/v1/users.post.json", "delete" to "api/v1/users/1.delete.json").forEach { (id, file) ->
+            compose.onNodeWithTag("feature-screen").performScrollToNode(hasTestTag("example-$id"))
+            compose.onNodeWithTag("send-$id").performClick()
+            compose.waitUntilAtLeastOneExists(hasAnyAncestor(hasTestTag("example-$id")) and hasText(file), 10_000)
+        }
+        pressBack()
+
+        compose.onNodeWithContentDescription("Recorded calls").performClick()
+        compose.onNodeWithText("Calls (2)").assertExists()
+        // Only the POST carried a body; the DELETE row shows none.
+        compose.onAllNodesWithTag("sent-body").assertCountEquals(1)
+        compose.onNodeWithText("""Sent: {"name":"Ana"}""").assertExists()
     }
 
     @Test

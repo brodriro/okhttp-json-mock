@@ -18,6 +18,8 @@ import java.io.IOException
  *
  * @property statusCode `null` when the call failed instead of answering, see [error].
  * @property mockFile the file that answered, from [io.github.brodriro.okhttpjsonmock.RecordedCall.mockFile].
+ * @property sentBody the request body as the interceptor recorded it, from
+ * [io.github.brodriro.okhttpjsonmock.RecordedCall.body], or `null` when the request had none.
  * @property log the lines the interceptor logged through its `MockLogger`.
  */
 class Exchange(
@@ -29,6 +31,7 @@ class Exchange(
     val body: ByteArray,
     val preview: BodyPreview,
     val mockFile: String?,
+    val sentBody: String?,
     val elapsedMillis: Long,
     val error: String?,
     val log: List<String>,

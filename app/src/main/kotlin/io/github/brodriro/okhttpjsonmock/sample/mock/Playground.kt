@@ -94,6 +94,7 @@ class Playground(private val assets: AssetManager) {
                     body = bytes,
                     preview = BodyPreview.of(bytes, contentType),
                     mockFile = interceptor.recordedCalls.lastOrNull()?.mockFile,
+                    sentBody = interceptor.recordedCalls.lastOrNull()?.body?.utf8(),
                     elapsedMillis = (System.nanoTime() - start) / 1_000_000,
                     error = null,
                     log = logLines.toList(),
@@ -109,6 +110,8 @@ class Playground(private val assets: AssetManager) {
                 body = ByteArray(0),
                 preview = BodyPreview.Empty,
                 mockFile = null,
+                // A call that fails for a missing mock is recorded too, with what was sent.
+                sentBody = interceptor.recordedCalls.lastOrNull()?.body?.utf8(),
                 elapsedMillis = (System.nanoTime() - start) / 1_000_000,
                 error = "${e.javaClass.simpleName}: ${e.message}",
                 log = logLines.toList(),
