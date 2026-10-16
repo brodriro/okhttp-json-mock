@@ -42,8 +42,10 @@ okhttp-json-mock/         the library, published to Maven Central
   api/                    recorded public API, checked by the build
   src/main/kotlin/        sources, package io.github.brodriro.okhttpjsonmock
   src/test/kotlin/        JUnit 5 tests
+  src/test/resources/     files read by the tests, such as one per extension
 app/                      Android sample app (Compose catalog of every feature), uses the library as a project dependency
   src/main/assets/        its mock files, also run by the library's SampleMocksTest
+  src/androidTest/        instrumented tests, run on a device or emulator
 consumer-test/            separate Gradle build that uses the library from mavenLocal, like a real project
 gradle/libs.versions.toml versions of every dependency and plugin
 .github/workflows/        CI, release, snapshot and API reference workflows
@@ -58,6 +60,7 @@ jitpack.yml               build of preview versions on JitPack
 | `MockFileResolver.kt` | Turns method, path and query into the ordered list of candidate files, `{id}` variants included. Internal. |
 | `MockEnvelope.kt` | Reads the `statusCode` / `headers` / `delayMs` / `response` wrapper with Gson. Internal. |
 | `ReasonPhrases.kt` | Reason phrase of every status code for the status line. Internal. |
+| `ContentTypes.kt` | `Content-Type` of each mock file extension. Internal. |
 | `MockLogger.kt` | The one-line log of each call, with `STDOUT` and `NONE`. |
 | `MissingMockException.kt`, `RecordedCall.kt` | Test options: `failOnMissingMock()` and `recordCalls()`. |
 | `providers/` | `InputStreamProvider`, the extension point, and the built-in providers for the filesystem (`DefaultInputStreamProvider`) and the classpath (`ClasspathInputStreamProvider`). |
