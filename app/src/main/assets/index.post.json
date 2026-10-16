@@ -1,0 +1,9 @@
+{
+  "statusCode": 202,
+  "headers": {
+    "Location": "/api/v1/jobs/1"
+  },
+  "response": {
+    "accepted": true
+  }
+}

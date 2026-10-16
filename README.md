@@ -690,7 +690,7 @@ that answered and the body, with images decoded and PDFs rendered:
 
 | Screen | What it shows |
 | --- | --- |
-| Paths and queries | Query files, the fallback to the path file, parameters in any order, nested paths |
+| Paths and queries | Query files, the fallback to the path file, parameters in any order, nested paths and the root path (`index.json`, `index.post.json`) |
 | One URL, many methods | `GET`, `PUT`, `DELETE` and `POST` on the same URL, each with its own file |
 | Paths with ids | `users/{id}.json` for any id, and the exact file winning over it |
 | Status, headers and latency | Wrapped mocks: 201 with `Location`, 204, 404, 422 and a slow mock with `delayMs` |
