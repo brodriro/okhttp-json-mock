@@ -17,6 +17,10 @@ released by this fork as `io.github.brodriro:okhttp-json-mock`.
 - The body of each recorded request: `RecordedCall.body` is the request body as it was sent, as an
   Okio `ByteString` (`body?.utf8()` for text), or `null` when the request had none or it is duplex. It
   is only read when `recordCalls()` is set.
+- Fewer lookups: a provider that also implements `ListableInputStreamProvider` lists its files once,
+  and the interceptor then asks it only for the file that answers, instead of one call per name it
+  tries. Answers do not change. `DefaultInputStreamProvider` does not list, so the filesystem keeps
+  seeing files added at any time.
 
 ## 4.0.0
 

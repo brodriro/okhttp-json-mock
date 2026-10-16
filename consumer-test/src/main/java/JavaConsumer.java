@@ -1,10 +1,16 @@
 import io.github.brodriro.okhttpjsonmock.MockLogger;
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor;
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider;
+import io.github.brodriro.okhttpjsonmock.providers.ListableInputStreamProvider;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import okhttp3.OkHttpClient;
 import okhttp3.MediaType;
@@ -48,6 +54,26 @@ public final class JavaConsumer {
         strict.newCall(request.newBuilder().post(body).build()).execute().close();
         results.put("recorded body", recording.getRecordedCalls().get(0).getBody() == null
             && "{\"name\":\"Ana\"}".equals(recording.getRecordedCalls().get(1).getBody().utf8()));
+        List<String> opened = new ArrayList<>();
+        ListableInputStreamProvider listable = new ListableInputStreamProvider() {
+            @Override
+            public InputStream provide(String path) {
+                opened.add(path);
+                return provider.provide(path);
+            }
+
+            @Override
+            public Collection<String> list() {
+                return Collections.singletonList("api/v1/users.json");
+            }
+        };
+        OkHttpClient indexed = new OkHttpClient.Builder()
+            .addInterceptor(new OkHttpMockInterceptor.Builder(listable).noDelay().logger(MockLogger.NONE).build())
+            .build();
+        try (Response response = indexed.newCall(request).execute()) {
+            results.put("listable provider", response.code() == 200
+                && opened.equals(Collections.singletonList("api/v1/users.json")));
+        }
         return results;
     }
 }

@@ -2,6 +2,7 @@ import io.github.brodriro.okhttpjsonmock.MissingMockException
 import io.github.brodriro.okhttpjsonmock.MockLogger
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
+import io.github.brodriro.okhttpjsonmock.providers.ListableInputStreamProvider
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -75,6 +76,22 @@ fun main() {
         strict.recordedCalls[0].body == null && strict.recordedCalls[2].body?.utf8() == """{"name":"Ana"}""",
         "calls are recorded with their body",
     )
+
+    val opened = mutableListOf<String>()
+    val listable = object : ListableInputStreamProvider {
+        override fun provide(path: String) = files[path]?.also { opened += path }?.byteInputStream()
+
+        override fun list() = files.keys
+    }
+    val indexed = OkHttpClient.Builder()
+        .addInterceptor(OkHttpMockInterceptor.Builder(listable).noDelay().logger(MockLogger.NONE).build())
+        .build()
+    indexed.newCall(Request.Builder().url("$url/42").build()).execute().use {
+        check(
+            it.code == 200 && opened == listOf("api/v1/users/{id}.json"),
+            "a listable provider is only asked for the file that answers",
+        )
+    }
 
     JavaConsumer.run().forEach { (what, ok) -> check(ok, "Java: $what") }
 

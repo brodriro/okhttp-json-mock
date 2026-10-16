@@ -2,6 +2,7 @@ package io.github.brodriro.okhttpjsonmock
 
 import io.github.brodriro.okhttpjsonmock.providers.DefaultInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
+import io.github.brodriro.okhttpjsonmock.providers.ListableInputStreamProvider
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Protocol
@@ -50,7 +51,8 @@ import kotlin.random.Random
  * The configuration is immutable and instances are safe to share between threads. Create them with
  * [Builder] or with one of the constructors kept from 3.0.
  *
- * @param inputStreamProvider where mock files are read from.
+ * @param inputStreamProvider where mock files are read from. A [ListableInputStreamProvider] is asked only for files
+ *   it listed.
  * @property failurePercentage chance, from 0 to 100, of answering with [failureCode] and an empty body.
  * @property basePath prefix added to every resolved file path.
  * @property minDelayMilliseconds lower bound of the simulated latency.
@@ -73,6 +75,10 @@ public class OkHttpMockInterceptor private constructor(
 
     private val resolver = MockFileResolver(basePath, extensions)
     private val calls = mutableListOf<RecordedCall>()
+
+    // Read on the first request; a failed list() is not kept, so the next request tries again.
+    private val listedFiles: Lazy<Set<String>>? = (inputStreamProvider as? ListableInputStreamProvider)
+        ?.let { provider -> lazy { provider.list().toHashSet() } }
 
     /**
      * The requests received so far, oldest first. Always empty unless the interceptor was built
@@ -153,7 +159,10 @@ public class OkHttpMockInterceptor private constructor(
         // Read before anything else: the mock never calls proceed, so even a one-shot body is ours to consume.
         val body = if (recordCalls) bodyOf(request) else null
         val candidates = resolver.candidates(request.method, request.url)
-        val match = candidates.firstNotNullOfOrNull { path -> readMock(path)?.let { path to it } }
+        val listed = listedFiles?.value
+        val match = candidates.firstNotNullOfOrNull { path ->
+            if (listed != null && path !in listed) null else readMock(path)?.let { path to it }
+        }
         val envelope = match
             ?.takeIf { (path, _) -> extensionOf(path).equals(MockFileResolver.DEFAULT_EXTENSION, ignoreCase = true) }
             ?.let { (path, mock) -> MockEnvelope.parseOrNull(mock, path) }

@@ -65,7 +65,8 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 - **Test helpers:** fail on a missing mock, and record which calls were made, with which file and
   status. [More](#using-it-in-tests)
 - **Any source of files:** Android assets, the filesystem, classpath resources or a map in memory,
-  through a one-method interface. [More](#writing-an-inputstreamprovider)
+  through a one-method interface. A provider that can list its files is only asked for the file that
+  answers. [More](#writing-an-inputstreamprovider)
 - **One log line per call**, saying which file answered and with which status. [More](#logging)
 - Written in Kotlin, usable from Java, on Android or any JVM. Immutable and safe to share between
   threads.
@@ -397,7 +398,9 @@ Good to know:
 - **Only `.json` files are read as [wrappers](#the-response-status-codes-headers-and-latency-per-mock).**
   Any other file is served as it is with status `200`, even if its text looks like a wrapper.
 - **Each extension adds one lookup per file name.** Listing three extensions asks the provider for
-  three times as many files, so list only the ones in use and keep `provide` cheap for a missing file.
+  three times as many files, so list only the ones in use and keep `provide` cheap for a missing file,
+  or use a provider that [lists its files](#fewer-lookups-a-provider-that-lists-its-files), which
+  makes the extra names free.
 
 ## Latency
 
@@ -602,7 +605,8 @@ The contract:
   names per request and most of them do not exist: up to six for a request whose exact file exists, and
   from a handful to over a hundred, depending on the number of path segments and query parameters, for
   one answered by an `{id}` file or by nothing. Each extension listed with `extensions(...)` multiplies
-  those numbers.
+  those numbers. A provider that [lists its files](#fewer-lookups-a-provider-that-lists-its-files) is
+  only asked for the file that answers.
 - **Open exactly the file you are asked for.** Answering an unknown name with some other file breaks
   the order in which mocks are chosen, because the provider is asked for the method files before the
   shared ones. `{id}` files cover the usual reason for doing it.
@@ -636,6 +640,60 @@ val inMemory = InputStreamProvider { path -> mocks[path]?.byteInputStream() }
 
 The filesystem: `DefaultInputStreamProvider()`, which resolves paths against the working directory.
 Combine it with `basePath` to point at a folder.
+
+### Fewer lookups: a provider that lists its files
+
+A provider that also implements `ListableInputStreamProvider` says which files it has. The interceptor
+calls its `list()` once, on the first request, and from then on picks the first name that is in the
+list without asking the provider, so `provide` is only called for the file that answers. A request
+without a mock costs no call at all. The answers are the same as without the list: same files, same
+order, same 404 and `MissingMockException`.
+
+Android assets, listed by walking `AssetManager.list`, which returns the children of a folder and
+nothing for a file:
+
+```kotlin
+class ListedAssets(private val assets: AssetManager) : ListableInputStreamProvider {
+    override fun provide(path: String): InputStream? = try {
+        assets.open(path)
+    } catch (e: IOException) {
+        null
+    }
+
+    override fun list(): Collection<String> = mutableListOf<String>().also { walk("", it) }
+
+    private fun walk(path: String, into: MutableList<String>) {
+        val children = assets.list(path).orEmpty()
+        if (children.isEmpty()) {
+            into += path
+        } else {
+            children.forEach { walk(if (path.isEmpty()) it else "$path/$it", into) }
+        }
+    }
+}
+```
+
+Files in memory:
+
+```kotlin
+val mocks = mapOf("api/v1/users/1.json" to """{ "id": 1 }""")
+val listed = object : ListableInputStreamProvider {
+    override fun provide(path: String) = mocks[path]?.byteInputStream()
+    override fun list() = mocks.keys
+}
+```
+
+What to keep in mind:
+
+- **List the paths exactly as `provide` receives them**: relative, with the `basePath` in front
+  (`mocks/api/v1/users/1.json` with `basePath("mocks/")`).
+- **The list is read once and kept** for the life of the interceptor, so a file added afterwards is not
+  seen. Use a plain `InputStreamProvider` when the files change while the app runs;
+  `DefaultInputStreamProvider` does not list for that reason.
+- **A file missing from the list is never served**, while an extra entry is harmless: if `provide`
+  returns `null` for a listed file, the next name is tried.
+- **If `list()` throws**, that request fails with the exception and the next request calls it again.
+- **Java** implements both methods, as with any interface of two methods.
 
 ## Recipes
 

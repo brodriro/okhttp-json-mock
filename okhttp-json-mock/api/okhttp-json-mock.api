@@ -64,3 +64,7 @@ public abstract interface class io/github/brodriro/okhttpjsonmock/providers/Inpu
 	public abstract fun provide (Ljava/lang/String;)Ljava/io/InputStream;
 }
 
+public abstract interface class io/github/brodriro/okhttpjsonmock/providers/ListableInputStreamProvider : io/github/brodriro/okhttpjsonmock/providers/InputStreamProvider {
+	public abstract fun list ()Ljava/util/Collection;
+}
+
