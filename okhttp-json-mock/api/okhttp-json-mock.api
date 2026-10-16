@@ -75,12 +75,3 @@ public abstract interface class io/github/brodriro/okhttpjsonmock/providers/List
 	public abstract fun list ()Ljava/util/Collection;
 }
 
-public final class io/github/brodriro/okhttpjsonmock/providers/ListedClasspathInputStreamProvider : io/github/brodriro/okhttpjsonmock/providers/ListableInputStreamProvider {
-	public fun <init> (Ljava/lang/String;)V
-	public fun <init> (Ljava/lang/String;Ljava/lang/ClassLoader;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/ClassLoader;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getRoot ()Ljava/lang/String;
-	public fun list ()Ljava/util/Collection;
-	public fun provide (Ljava/lang/String;)Ljava/io/InputStream;
-}
-
