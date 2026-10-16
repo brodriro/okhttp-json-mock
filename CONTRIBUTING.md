@@ -60,7 +60,7 @@ jitpack.yml               build of preview versions on JitPack
 | `ReasonPhrases.kt` | Reason phrase of every status code for the status line. Internal. |
 | `MockLogger.kt` | The one-line log of each call, with `STDOUT` and `NONE`. |
 | `MissingMockException.kt`, `RecordedCall.kt` | Test options: `failOnMissingMock()` and `recordCalls()`. |
-| `providers/` | `InputStreamProvider`, the extension point, and `DefaultInputStreamProvider` for the filesystem. |
+| `providers/` | `InputStreamProvider`, the extension point, and the built-in providers for the filesystem (`DefaultInputStreamProvider`) and the classpath (`ClasspathInputStreamProvider`). |
 
 A change to which file answers a request goes in `MockFileResolver` and its test,
 `MockFileResolverTest`. A change to what a mock file can say goes in `MockEnvelope` and
