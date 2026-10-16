@@ -17,3 +17,4 @@ Changes made in this fork since version 3.0:
 - Interceptors are immutable and are configured through a builder, which can
   also make a missing mock fail and record the calls received, for tests.
 - The sample application was rewritten in Kotlin.
+- A provider for mock files on the classpath is included.

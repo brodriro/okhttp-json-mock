@@ -17,6 +17,9 @@ released by this fork as `io.github.brodriro:okhttp-json-mock`.
 - The body of each recorded request: `RecordedCall.body` is the request body as it was sent, as an
   Okio `ByteString` (`body?.utf8()` for text), or `null` when the request had none or it is duplex. It
   is only read when `recordCalls()` is set.
+- A built-in classpath provider: `ClasspathInputStreamProvider()` reads mocks from the classpath
+  (`src/test/resources`, jars, the Java resources of an APK) with the class loader of the library or
+  the one it is given.
 
 ## 4.0.0
 

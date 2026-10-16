@@ -95,8 +95,9 @@ cd okhttp-json-mock
 ./gradlew :app:installDebug
 ```
 
-Every screen is backed by the mock files in [`app/src/main/assets`](app/src/main/assets), so the app is
-also a set of working examples to copy from. [Example](#example) lists what each screen covers.
+Every screen is backed by the mock files in [`app/src/main/assets`](app/src/main/assets) (the classpath
+screen by the Java resources in [`app/src/main/resources`](app/src/main/resources)), so the app is also a
+set of working examples to copy from. [Example](#example) lists what each screen covers.
 
 ## Installation
 
@@ -552,8 +553,15 @@ OkHttpMockInterceptor.Builder(DefaultInputStreamProvider())
     .build()
 ```
 
-Mocks only for tests can go in `src/test/resources` and be read from the classpath: see
-[Writing an InputStreamProvider](#writing-an-inputstreamprovider).
+Mocks only for tests can go in `src/test/resources` and be read from the classpath with the built-in
+provider:
+
+```kotlin
+OkHttpMockInterceptor.Builder(ClasspathInputStreamProvider())
+    .basePath("mocks/")             // src/test/resources/mocks/...
+    .noDelay()
+    .build()
+```
 
 ## Configuration reference
 
@@ -620,11 +628,12 @@ val assets = InputStreamProvider { path ->
 }
 ```
 
-Classpath resources, for example `src/test/resources`. `getResourceAsStream` already returns `null` for
-a missing file:
+Classpath resources, for example `src/test/resources`, the resources of a jar or the Java resources of
+an APK: the built-in `ClasspathInputStreamProvider()`, which uses the class loader of the library or the
+one it is given. Paths are resource names, so a folder of mocks goes in `basePath`:
 
 ```kotlin
-val resources = InputStreamProvider { path -> javaClass.classLoader.getResourceAsStream(path) }
+OkHttpMockInterceptor.Builder(ClasspathInputStreamProvider()).basePath("mocks/").build()
 ```
 
 Files in memory:
@@ -708,6 +717,7 @@ that answered and the body, with images decoded and PDFs rendered:
 | Paths with ids | `users/{id}.json` for any id, and the exact file winning over it |
 | Status, headers and latency | Wrapped mocks: 201 with `Location`, 204, 404, 422 and a slow mock with `delayMs` |
 | Not only JSON | `extensions(...)` with an image, PDF, SVG, XML, HTML, CSV, text and an unknown extension |
+| Classpath resources | `ClasspathInputStreamProvider` reading the app's Java resources, `{id}` file included |
 | When no mock matches | The 404 that lists the files tried, and `failOnMissingMock()` |
 | Simulated network | Latency, failure percentage and status, strict mode, and ten calls at once |
 | Recorded calls and log | `recordCalls()` and the `MockLogger` lines of the session |

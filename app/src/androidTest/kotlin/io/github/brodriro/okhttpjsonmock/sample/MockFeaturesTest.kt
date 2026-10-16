@@ -4,7 +4,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.brodriro.okhttpjsonmock.MissingMockException
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
+import io.github.brodriro.okhttpjsonmock.sample.mock.Latency
+import io.github.brodriro.okhttpjsonmock.sample.mock.MockSource
+import io.github.brodriro.okhttpjsonmock.sample.mock.NetworkSettings
 import io.github.brodriro.okhttpjsonmock.sample.mock.Playground
+import io.github.brodriro.okhttpjsonmock.sample.mock.SampleRequest
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -239,5 +244,20 @@ class MockFeaturesTest {
         }
 
         assertEquals("""{"item":7}""", strict.recordedCalls.single().body?.utf8())
+    }
+
+    @Test
+    fun classpathProviderReadsTheJavaResourcesOfTheApk() {
+        val playground = Playground(InstrumentationRegistry.getInstrumentation().targetContext.assets)
+        val settings = NetworkSettings(latency = Latency.NONE)
+        val source = MockSource.CLASSPATH
+
+        val ping = runBlocking { playground.send(SampleRequest("GET", "api/v1/ping", source = source), settings) }
+        val user = runBlocking { playground.send(SampleRequest("GET", "api/v1/users/42", source = source), settings) }
+
+        assertEquals(ping.error, 200, ping.statusCode)
+        assertEquals("mocks/api/v1/ping.json", ping.mockFile)
+        assertEquals("classpath", JSONObject(ping.body.decodeToString()).getString("from"))
+        assertEquals("mocks/api/v1/users/{id}.json", user.mockFile)
     }
 }
