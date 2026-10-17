@@ -6,6 +6,10 @@ Versions up to 3.0 were released by the original project,
 [mirrajabi/okhttp-json-mock](https://github.com/mirrajabi/okhttp-json-mock). From 4.0.0 on they are
 released by this fork as `io.github.brodriro:okhttp-json-mock`.
 
+## 4.2.0 (unreleased)
+
+No changes yet.
+
 ## 4.1.0
 
 ### Added
