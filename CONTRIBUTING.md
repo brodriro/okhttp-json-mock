@@ -13,7 +13,7 @@ agreed first.
 
 ## Setting up
 
-You need JDK 17 or newer. The sample app also needs an Android SDK with platform 36, pointed to by
+You need JDK 17 or newer. The sample app also needs an Android SDK with platform 37, pointed to by
 `ANDROID_HOME` or `local.properties`. To work on the library alone you can skip it and use the
 `:okhttp-json-mock` tasks.
 
@@ -42,8 +42,11 @@ okhttp-json-mock/         the library, published to Maven Central
   api/                    recorded public API, checked by the build
   src/main/kotlin/        sources, package io.github.brodriro.okhttpjsonmock
   src/test/kotlin/        JUnit 5 tests
-app/                      Android sample app, uses the library as a project dependency
+  src/test/resources/     files read by the tests: one per extension, and classpath mocks
+app/                      Android sample app (Compose catalog of every feature), uses the library as a project dependency
   src/main/assets/        its mock files, also run by the library's SampleMocksTest
+  src/main/resources/     Java resources read by the classpath screen
+  src/androidTest/        instrumented tests, run on a device or emulator
 consumer-test/            separate Gradle build that uses the library from mavenLocal, like a real project
 gradle/libs.versions.toml versions of every dependency and plugin
 .github/workflows/        CI, release, snapshot and API reference workflows
@@ -58,9 +61,10 @@ jitpack.yml               build of preview versions on JitPack
 | `MockFileResolver.kt` | Turns method, path and query into the ordered list of candidate files, `{id}` variants included. Internal. |
 | `MockEnvelope.kt` | Reads the `statusCode` / `headers` / `delayMs` / `response` wrapper with Gson. Internal. |
 | `ReasonPhrases.kt` | Reason phrase of every status code for the status line. Internal. |
+| `ContentTypes.kt` | `Content-Type` of each mock file extension. Internal. |
 | `MockLogger.kt` | The one-line log of each call, with `STDOUT` and `NONE`. |
 | `MissingMockException.kt`, `RecordedCall.kt` | Test options: `failOnMissingMock()` and `recordCalls()`. |
-| `providers/` | `InputStreamProvider`, the extension point, and `DefaultInputStreamProvider` for the filesystem. |
+| `providers/` | `InputStreamProvider`, the extension point, and the built-in providers for the filesystem (`DefaultInputStreamProvider`) and the classpath (`ClasspathInputStreamProvider`). |
 
 A change to which file answers a request goes in `MockFileResolver` and its test,
 `MockFileResolverTest`. A change to what a mock file can say goes in `MockEnvelope` and

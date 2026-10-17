@@ -10,8 +10,12 @@ class MockFileResolverTest {
     private fun candidates(method: String, url: String, basePath: String = "") =
         allCandidates(method, url, basePath).filterNot { "{id}" in it }
 
-    private fun allCandidates(method: String, url: String, basePath: String = "") =
-        MockFileResolver(basePath).candidates(method, url.toHttpUrl())
+    private fun allCandidates(
+        method: String,
+        url: String,
+        basePath: String = "",
+        extensions: List<String> = listOf("json"),
+    ) = MockFileResolver(basePath, extensions).candidates(method, url.toHttpUrl())
 
     @Test
     fun `method file comes before the file shared by every method`() {
@@ -147,6 +151,42 @@ class MockFileResolverTest {
         assertEquals(
             listOf("mocks/users.get.json", "mocks/users.json", "mocks/{id}.get.json", "mocks/{id}.json"),
             allCandidates("GET", "http://example.com/users", basePath = "mocks/"),
+        )
+    }
+
+    @Test
+    fun `each file name is tried with every extension before the next name`() {
+        assertEquals(
+            listOf(
+                "feed/page=1.get.json",
+                "feed/page=1.get.xml",
+                "feed.get.json",
+                "feed.get.xml",
+                "feed/page=1.json",
+                "feed/page=1.xml",
+                "feed.json",
+                "feed.xml",
+            ),
+            allCandidates("GET", "http://example.com/feed?page=1", extensions = listOf("json", "xml"))
+                .filterNot { "{id}" in it },
+        )
+    }
+
+    @Test
+    fun `extensions are tried in the order they were given`() {
+        assertEquals(
+            listOf("feed.get.xml", "feed.get.json", "feed.xml", "feed.json"),
+            allCandidates("GET", "http://example.com/feed", extensions = listOf("xml", "json"))
+                .filterNot { "{id}" in it },
+        )
+    }
+
+    @Test
+    fun `placeholder and base path candidates also get every extension`() {
+        assertEquals(
+            listOf("mocks/images/{id}.get.png", "mocks/images/{id}.png"),
+            allCandidates("GET", "http://example.com/images/1", basePath = "mocks/", extensions = listOf("png"))
+                .filter { it.startsWith("mocks/images/{id}") },
         )
     }
 }

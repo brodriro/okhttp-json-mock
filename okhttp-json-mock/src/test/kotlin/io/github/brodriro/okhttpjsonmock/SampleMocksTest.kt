@@ -101,4 +101,57 @@ class SampleMocksTest {
 
         assertEquals("Generic", user.asJsonObject.get("name").asString)
     }
+
+    @Test
+    fun `any other page falls back to the file shared by every query`() {
+        val users = JsonParser.parseString(send("GET", "api/v1/users?page=7").body!!.string()).asJsonArray
+
+        assertEquals("Any", users.single().asJsonObject.get("name").asString)
+    }
+
+    @Test
+    fun `parameters in another order find the file named with them sorted`() {
+        val users = JsonParser.parseString(send("GET", "api/v1/users?sort=name&role=admin").body!!.string())
+
+        assertEquals("Ada", users.asJsonArray.single().asJsonObject.get("name").asString)
+    }
+
+    @Test
+    fun `a form error answers 422 with its body`() {
+        val response = send("POST", "api/v1/sessions")
+
+        assertEquals(422, response.code)
+        assertTrue("invalid_credentials" in response.body!!.string())
+    }
+
+    @Test
+    fun `files that are not json are served with the type of their extension`() {
+        val files = OkHttpClient.Builder()
+            .addInterceptor(
+                OkHttpMockInterceptor.Builder(DefaultInputStreamProvider())
+                    .basePath(SAMPLE_ASSETS)
+                    .extensions("png", "pdf", "xml")
+                    .noDelay()
+                    .logger(MockLogger.NONE)
+                    .build(),
+            )
+            .build()
+        val types = listOf("logo", "manual", "feed").map { name ->
+            files.newCall(Request.Builder().url("http://example.com/api/v1/files/$name").build()).execute().use {
+                it.header("Content-Type")
+            }
+        }
+
+        assertEquals(listOf("image/png", "application/pdf", "application/xml"), types)
+    }
+
+    @Test
+    fun `the root path is answered by index files, one per method`() {
+        val root = JsonParser.parseString(send("GET", "").body!!.string()).asJsonObject
+        val accepted = send("POST", "")
+
+        assertEquals("v1", root.get("api").asString)
+        assertEquals(202, accepted.code)
+        assertEquals("/api/v1/jobs/1", accepted.header("Location"))
+    }
 }

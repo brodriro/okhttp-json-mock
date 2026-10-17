@@ -6,6 +6,21 @@ Versions up to 3.0 were released by the original project,
 [mirrajabi/okhttp-json-mock](https://github.com/mirrajabi/okhttp-json-mock). From 4.0.0 on they are
 released by this fork as `io.github.brodriro:okhttp-json-mock`.
 
+## 4.1.0
+
+### Added
+
+- Mocks that are not JSON: `Builder.extensions("json", "xml", "png")` lists the extensions of mock
+  files, tried in that order for each file name, and the response gets the `Content-Type` of the
+  extension that matched. Only `.json` files are read as wrappers. The configured list can be read back
+  as `extensions`. Without it only `.json` files are looked up, as before.
+- The body of each recorded request: `RecordedCall.body` is the request body as it was sent, as an
+  Okio `ByteString` (`body?.utf8()` for text), or `null` when the request had none or it is duplex. It
+  is only read when `recordCalls()` is set.
+- A built-in classpath provider: `ClasspathInputStreamProvider()` reads mocks from the classpath
+  (`src/test/resources`, jars, the Java resources of an APK) with the class loader of the library or
+  the one it is given.
+
 ## 4.0.0
 
 First release of the fork. See [Migrating from 3.0](README.md#migrating-from-30).

@@ -9,22 +9,23 @@ A small JVM library that mocks HTTP responses for OkHttp/Retrofit: an OkHttp `In
 ## Modules
 
 - `okhttp-json-mock/` — the library. Kotlin (`explicitApi`), Java 8 bytecode, language/API version 2.0 and `kotlin-stdlib` 2.0.21 on purpose (so consumers on Kotlin 1.9+ can read its metadata; do not use newer language features or stdlib APIs), published as `io.github.brodriro:okhttp-json-mock`.
-- `app/` — Android sample app in Kotlin (Retrofit suspend calls, coroutines, AndroidX) that consumes the library via `project(":okhttp-json-mock")`. Its mock data lives in `app/src/main/assets/api/v1/...` and is also exercised by the library's `SampleMocksTest`. It needs no Kotlin plugin: AGP 9 compiles Kotlin on its own.
+- `app/` — Android sample app that consumes the library via `project(":okhttp-json-mock")`: a Jetpack Compose (Material 3) catalog with one screen per feature, each sending requests through the interceptor and showing status, headers, the mock file and the body (images decoded, PDFs rendered). `catalog/Catalog.kt` lists the features and their example requests, `mock/Playground.kt` builds the interceptor and runs them (each request picks a `MockSource`: the assets, or the Java resources in `app/src/main/resources/mocks` through `ClasspathInputStreamProvider`), `ui/` holds the screens, and the Retrofit `UsersService` is kept as one of the features. Its mock data lives in `app/src/main/assets/api/v1/...` and is also exercised by the library's `SampleMocksTest`; its instrumented tests in `app/src/androidTest` (`MockFeaturesTest`, `MockExtensionsTest`, `CatalogUiTest`) check every feature on a device, and `ReadmeSnippetsTest` / `ReadmeJavaSnippetTest` run the Android snippets of the README as they are written (keep them in sync), with the quick-start mock in `src/androidTest/assets`. Kotlin is compiled by AGP 9 itself; the only Kotlin plugin is the Compose compiler one. It compiles against SDK 37 (required by the Compose BOM) and targets 36.
 
 - `consumer-test/` — standalone Gradle build, not included in the root project, that consumes the published artifact from `mavenLocal` from Kotlin and Java. CI runs it against several Kotlin versions.
 
 ## Commands
 
-Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions in `gradle/libs.versions.toml`. Needs JDK 17+ (21 is what is installed locally). `app` also needs an Android SDK (`ANDROID_HOME` or `local.properties`) with platform 36.
+Toolchain: Gradle 9.8.1 (wrapper), AGP 9.4.1, Kotlin DSL build scripts, versions in `gradle/libs.versions.toml`. Needs JDK 17+ (21 is what is installed locally). `app` also needs an Android SDK (`ANDROID_HOME` or `local.properties`) with platform 37.
 
 ```sh
 ./gradlew :okhttp-json-mock:build                # build the library only
 ./gradlew :app:assembleDebug                   # build the sample app
 ./gradlew :app:installDebug                    # install the sample on a connected device
+./gradlew :app:assembleDebugAndroidTest        # build the instrumented tests of the sample (run them on a device)
 ./gradlew :okhttp-json-mock:publishToMavenLocal  # jar + sources + javadoc + pom into ~/.m2
 ```
 
-The library has JUnit 5 tests written in Kotlin under `okhttp-json-mock/src/test/kotlin`. Most drive the interceptor through a real `OkHttpClient` with an in-memory `InputStreamProvider`; `MockFileResolverTest`, `MockEnvelopeTest` and `ReasonPhrasesTest` test those classes directly.
+The library has JUnit 5 tests written in Kotlin under `okhttp-json-mock/src/test/kotlin`. Most drive the interceptor through a real `OkHttpClient` with an in-memory `InputStreamProvider`; `MockFileResolverTest`, `MockEnvelopeTest` and `ReasonPhrasesTest` test those classes directly, and `ClasspathProviderTest` the classpath provider with `src/test/resources/classpath-mocks` and a jar built by the test.
 
 ```sh
 ./gradlew :okhttp-json-mock:test                                              # all library tests
@@ -70,6 +71,8 @@ The library is compiled with language and API version 2.0 and `kotlin-stdlib` 2.
 3. `api/v1/users/page=1.json` — any method, this query.
 4. `api/v1/users.json` — any method, any query.
 
+`Builder.extensions(...)` replaces the `.json` extension with a list (`extensions("json", "xml")`): every name above is tried with each extension, in the given order, before the next name, so a more specific name wins over the extension order. The response gets the `Content-Type` of the matched extension from the fixed table in `ContentTypes` (`application/octet-stream` for an unknown one), and only `.json` files are parsed as envelopes. The default list is `json`, which keeps the 4.0 resolution; each extra extension multiplies the provider calls.
+
 The method suffix is the HTTP method in lower case (`.get`, `.post`, `.put`, `.delete`, `.patch`, …). Files without it answer every method, which keeps 3.0 mocks working and is how one URL gets a different mock per method.
 
 When none of those exists, the same names are tried with `{id}` in place of a path segment (`api/v1/{id}.get.json`, `api/{id}/users.get.json`, …): one segment at a time starting from the last, then two at a time, never more than two. A file or folder literally named `{id}` therefore answers any value of that segment (`users/{id}.json`, `users/{id}/posts.json`), and a file for the exact path always wins. `basePath` is never replaced. Braces cannot clash with a real path because OkHttp percent-encodes them in URLs, and aapt packages `{id}` assets with its default settings (a leading underscore would be ignored for folders).
@@ -78,7 +81,7 @@ With several query parameters the exact string is tried first (`page=1&categoryI
 
 A mock is answered as it is with status 200. To answer with another status the file wraps the response in an envelope read by `MockEnvelope` with Gson: `{ "statusCode": 201, "response": { ... } }` answers 201 with the `response` value as the body, and `{ "statusCode": 204 }` answers with no body. An optional `"headers": { "Location": "/users/4" }` object adds response headers (values may be strings, numbers or booleans; `Content-Type` replaces the default), and an optional `"delayMs": 2000` replaces the interceptor's latency for that file. A file is an envelope only when it is an object that has `statusCode` and no keys other than `statusCode`, `headers`, `delayMs` and `response`; everything else, including a real payload with a `statusCode` field plus other keys, is served untouched. An envelope whose `statusCode` is not an HTTP status, whose `headers` is not an object of valid names and simple values, or whose `delayMs` is not a whole number from 0 up, fails the call with an `IOException` naming the file.
 
-Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; Android consumers pass one backed by `assets.open(path)` (see `MainActivity.assetsProvider`). A provider signals "not found" by returning `null`.
+Each candidate is handed to an `InputStreamProvider`, the single extension point that decides where files come from. `DefaultInputStreamProvider` reads from the filesystem; `ClasspathInputStreamProvider` from a class loader; Android consumers pass one backed by `assets.open(path)` (see `mock/Playground.provider` in the sample). A provider signals "not found" by returning `null`.
 
 Behaviours that are easy to miss:
 
@@ -87,14 +90,14 @@ Behaviours that are easy to miss:
 - A provider is asked for the method files before the shared ones. A provider with its own fallback (for example a generic `_id.json` for any id) must not mistake the method suffix for a path segment (the built-in `{id}` files make such providers unnecessary); this broke a real app during migration and is called out in the README migration guide.
 - The real network is never hit: `chain.proceed` is not called.
 - No matching file → 404 with a `text/plain` body listing the exact-path files that were tried and counting the `{id}` ones. This wins over the simulated failure.
-- `Builder.failOnMissingMock()` replaces that 404 with a `MissingMockException` (an `IOException`, so asynchronous calls get it in `onFailure`). `Builder.recordCalls()` keeps each request as a `RecordedCall` (method, url, mock file, status; status is `null` when the call failed for a missing mock) in `recordedCalls`, a snapshot guarded by a lock; `clearRecordedCalls()` empties it. Both are off by default and unavailable through the 3.0 constructors.
+- `Builder.failOnMissingMock()` replaces that 404 with a `MissingMockException` (an `IOException`, so asynchronous calls get it in `onFailure`). `Builder.recordCalls()` keeps each request as a `RecordedCall` (method, url, mock file, status and the request body as an okio `ByteString`; status is `null` when the call failed for a missing mock, body is `null` when the request had none or it is duplex, and it is only read when recording is on) in `recordedCalls`, a snapshot guarded by a lock; `clearRecordedCalls()` empties it. Both are off by default and unavailable through the 3.0 constructors.
 - `failurePercentage` (0–100) is the chance of answering with `failureCode` (504 by default) and an empty body.
 - Every call sleeps a random time in `[minDelay, maxDelay)` (default 500–1500 ms), or exactly the envelope's `delayMs` when it has one; equal bounds give a fixed delay. The envelope is parsed before the sleep, so an invalid one fails without waiting. An interrupt during the sleep throws `InterruptedIOException`.
-- A plain mock is returned byte for byte as `application/json`; an envelope's `response` is re-serialised by Gson (compact, nulls and number text preserved). The status line carries the reason phrase from `ReasonPhrases` (every IANA-registered code with its RFC 9110 name, plus 418; any other code gets its class name, such as `Client Error`).
-- Gson is an `implementation` dependency used only by `MockEnvelope`; files that do not contain the text `statusCode` are never parsed.
-- The configuration is immutable; the only mutable state is the list of recorded calls. Instances are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which also exposes `failureCode`, `logger` and `noDelay()`.
+- A plain mock is returned byte for byte as `application/json` (or the type of its extension); an envelope's `response` is re-serialised by Gson (compact, nulls and number text preserved). The status line carries the reason phrase from `ReasonPhrases` (every IANA-registered code with its RFC 9110 name, plus 418; any other code gets its class name, such as `Client Error`).
+- Gson is an `implementation` dependency used only by `MockEnvelope`; files that are not `.json` or do not contain the text `statusCode` are never parsed.
+- The configuration is immutable; the only mutable state is the list of recorded calls. Instances are created with the constructors kept from 3.0 or with `OkHttpMockInterceptor.Builder`, which is the only way to set `failureCode`, `logger`, `extensions`, `failOnMissingMock()` and `recordCalls()`, and also has `noDelay()`.
 - Each call logs one line through `MockLogger` (`STDOUT` by default, `NONE` to silence).
-- Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`) throws `IllegalArgumentException` at construction.
+- Invalid configuration (percentage outside 0–100, negative or inverted delays, non-error `failureCode`, an empty `extensions` list or an extension that is not letters and digits) throws `IllegalArgumentException` at construction.
 
 ## Git workflow
 

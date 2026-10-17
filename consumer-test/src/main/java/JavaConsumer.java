@@ -1,5 +1,6 @@
 import io.github.brodriro.okhttpjsonmock.MockLogger;
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor;
+import io.github.brodriro.okhttpjsonmock.providers.ClasspathInputStreamProvider;
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -7,7 +8,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import okhttp3.OkHttpClient;
+import okhttp3.MediaType;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /** Uses the library the way a Java project does: a lambda provider, the builder and a 3.0 constructor. */
@@ -42,6 +45,18 @@ public final class JavaConsumer {
         strict.newCall(request).execute().close();
         results.put("recorded calls", recording.getRecordedCalls().size() == 1
             && Integer.valueOf(200).equals(recording.getRecordedCalls().get(0).getStatusCode()));
+        RequestBody body = RequestBody.create("{\"name\":\"Ana\"}", MediaType.get("application/json"));
+        strict.newCall(request.newBuilder().post(body).build()).execute().close();
+        results.put("recorded body", recording.getRecordedCalls().get(0).getBody() == null
+            && "{\"name\":\"Ana\"}".equals(recording.getRecordedCalls().get(1).getBody().utf8()));
+        Request ping = new Request.Builder().url("http://example.com/api/ping").build();
+        OkHttpClient fromClasspath = new OkHttpClient.Builder()
+            .addInterceptor(new OkHttpMockInterceptor.Builder(new ClasspathInputStreamProvider()).basePath("mocks/")
+                .noDelay().logger(MockLogger.NONE).build())
+            .build();
+        try (Response response = fromClasspath.newCall(ping).execute()) {
+            results.put("ClasspathInputStreamProvider", response.code() == 200);
+        }
         return results;
     }
 }

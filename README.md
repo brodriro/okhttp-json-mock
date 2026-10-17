@@ -21,6 +21,7 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 ## Contents
 
 - [Features](#features)
+- [See it in the demo app](#see-it-in-the-demo-app)
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Android setup](#android-setup)
@@ -28,6 +29,7 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 - [Paths with ids](#paths-with-ids)
 - [One URL, different HTTP methods](#one-url-different-http-methods)
 - [The response: status codes, headers and latency per mock](#the-response-status-codes-headers-and-latency-per-mock)
+- [Mocks that are not JSON](#mocks-that-are-not-json)
 - [Latency](#latency)
 - [Simulated failures](#simulated-failures)
 - [Logging](#logging)
@@ -54,17 +56,48 @@ GET  /api/v1/users/42  →  api/v1/users/{id}.json
 - **Status code, headers and latency per mock**, written inside the mock file:
   `{ "statusCode": 201, "headers": { ... }, "delayMs": 2000, "response": { ... } }`.
   [More](#the-response-status-codes-headers-and-latency-per-mock)
+- **Not only JSON:** XML, plain text, images or any other file, served with the `Content-Type` of its
+  extension once the extension is listed. [More](#mocks-that-are-not-json)
 - **Simulated network:** a random latency on every call, and an optional percentage of calls that
   fail with a configurable status. [Latency](#latency), [failures](#simulated-failures)
 - **Clear answers when something is missing:** a 404 that lists the files that were looked for, or an
   exception in tests. [More](#when-no-mock-matches)
-- **Test helpers:** fail on a missing mock, and record which calls were made, with which file and
-  status. [More](#using-it-in-tests)
+- **Test helpers:** fail on a missing mock, and record which calls were made, with which file, which
+  status and which request body. [More](#using-it-in-tests)
 - **Any source of files:** Android assets, the filesystem, classpath resources or a map in memory,
   through a one-method interface. [More](#writing-an-inputstreamprovider)
 - **One log line per call**, saying which file answered and with which status. [More](#logging)
 - Written in Kotlin, usable from Java, on Android or any JVM. Immutable and safe to share between
   threads.
+
+## See it in the demo app
+
+The repository ships an Android app that puts every feature in your hands before you add a line to your
+own project. Each screen sends real requests through the interceptor and shows what came back: the
+status, the headers, the mock file that answered and the body, with JSON formatted, images decoded and
+PDFs rendered. Change the latency or the failure rate and watch the next calls follow.
+
+<p align="center">
+  <img src=".github/assets/sample/1-catalog.png" width="24%" alt="Catalog of every feature of the library">
+  <img src=".github/assets/sample/2-responses.png" width="24%" alt="Mocks answering 201 with a Location header and 204 without a body">
+  <img src=".github/assets/sample/3-files.png" width="24%" alt="A PNG mock decoded on the device, with its Content-Type">
+  <img src=".github/assets/sample/4-network-dark.png" width="24%" alt="Simulated network in dark mode: ten calls with 30 % of failures">
+</p>
+
+<p align="center"><sub>Every feature at a glance · status, headers and body per mock · images, PDFs and more
+with <code>extensions(...)</code> · latency and failures you can tune, in light or dark</sub></p>
+
+Try it in a minute, with a device or an emulator connected:
+
+```sh
+git clone https://github.com/brodriro/okhttp-json-mock.git
+cd okhttp-json-mock
+./gradlew :app:installDebug
+```
+
+Every screen is backed by the mock files in [`app/src/main/assets`](app/src/main/assets) (the classpath
+screen by the Java resources in [`app/src/main/resources`](app/src/main/resources)), so the app is also a
+set of working examples to copy from. [Example](#example) lists what each screen covers.
 
 ## Installation
 
@@ -72,7 +105,7 @@ The library is on Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("io.github.brodriro:okhttp-json-mock:4.0.0")
+    implementation("io.github.brodriro:okhttp-json-mock:4.1.0")
 }
 ```
 
@@ -255,6 +288,9 @@ Only when none of those exists does it try the same names with `{id}` in place o
 segment at a time starting from the last (`api/v1/{id}`, `api/{id}/users`, `{id}/v1/users`), then two
 at a time. The `basePath` is prepended to every name.
 
+With [other extensions](#mocks-that-are-not-json) each of these names is tried with every extension, in
+the order they were listed, before moving to the next name.
+
 ## The response: status codes, headers and latency per mock
 
 By default the file **is** the response body, returned byte for byte with status `200` and
@@ -321,6 +357,48 @@ An error with a body:
   "response": { "error": "email_taken", "message": "That email is already registered" }
 }
 ```
+
+## Mocks that are not JSON
+
+Mock files are `.json` unless more extensions are listed with `extensions(...)`:
+
+```kotlin
+OkHttpMockInterceptor.Builder(provider)
+    .extensions("json", "xml", "png")
+    .build()
+```
+
+`GET /api/v1/feed` is then answered by the first of `api/v1/feed.get.json`, `api/v1/feed.get.xml`,
+`api/v1/feed.get.png`, `api/v1/feed.json`, `api/v1/feed.xml` and `api/v1/feed.png` that exists. A
+more specific name always wins over the order of the extensions, and `{id}` files work with any
+extension: `images/{id}.png` answers `/images/1` and `/images/42`.
+
+The file is returned byte for byte, so binary files such as images arrive untouched, with the
+`Content-Type` of the extension that matched:
+
+| Extension | `Content-Type` |
+| --- | --- |
+| `json` | `application/json` |
+| `txt` | `text/plain; charset=utf-8` |
+| `html`, `htm` | `text/html; charset=utf-8` |
+| `csv` | `text/csv; charset=utf-8` |
+| `xml` | `application/xml` |
+| `svg` | `image/svg+xml` |
+| `png` | `image/png` |
+| `jpg`, `jpeg` | `image/jpeg` |
+| `gif` | `image/gif` |
+| `webp` | `image/webp` |
+| `pdf` | `application/pdf` |
+| any other | `application/octet-stream` |
+
+Good to know:
+
+- **The list replaces the default**, so include `json` to keep finding JSON mocks. A leading dot is
+  ignored (`".xml"` is `"xml"`), and an extension is letters and digits only.
+- **Only `.json` files are read as [wrappers](#the-response-status-codes-headers-and-latency-per-mock).**
+  Any other file is served as it is with status `200`, even if its text looks like a wrapper.
+- **Each extension adds one lookup per file name.** Listing three extensions asks the provider for
+  three times as many files, so list only the ones in use and keep `provide` cheap for a missing file.
 
 ## Latency
 
@@ -423,6 +501,7 @@ class UserRepositoryTest {
         assertEquals("/api/v1/users", call.url.encodedPath)
         assertEquals(201, call.statusCode)
         assertEquals("api/v1/users.post.json", call.mockFile)
+        assertEquals("""{"name":"Ana"}""", call.body?.utf8())
     }
 }
 ```
@@ -449,8 +528,20 @@ Recording is off by default because the list grows for as long as the intercepto
 | `url` | `HttpUrl` of the request, with its query. |
 | `mockFile` | The file that answered, with the `basePath` in front, or `null` when none matched. |
 | `statusCode` | The status of the answer, a simulated failure's included, or `null` when the call failed with `MissingMockException`. |
+| `body` | The request body as it was sent, as an Okio `ByteString`, or `null` when the request had none. |
 
-The request body and headers are not recorded.
+The body lets a test check what was sent and not only where. `ByteString` comes with OkHttp, keeps
+binary bodies byte for byte and compares by content:
+
+```kotlin
+val call = interceptor.recordedCalls.single()
+assertEquals("""{"name":"Ana"}""", call.body?.utf8())        // the text, for JSON or forms
+assertEquals(expectedBytes.toByteString(), call.body)          // the exact bytes, for binaries
+```
+
+An empty body is `ByteString.EMPTY`. A duplex body (`isDuplex()`) cannot be read without consuming the
+call, so it is recorded as `null`. The body is only read when `recordCalls()` is set, and every recorded
+call keeps it in memory. The request headers are not recorded.
 
 **Reusing the app's mocks in unit tests.** Gradle runs unit tests from the module folder, so the
 filesystem provider can read the same files the app uses:
@@ -462,8 +553,15 @@ OkHttpMockInterceptor.Builder(DefaultInputStreamProvider())
     .build()
 ```
 
-Mocks only for tests can go in `src/test/resources` and be read from the classpath: see
-[Writing an InputStreamProvider](#writing-an-inputstreamprovider).
+Mocks only for tests can go in `src/test/resources` and be read from the classpath with the built-in
+provider:
+
+```kotlin
+OkHttpMockInterceptor.Builder(ClasspathInputStreamProvider())
+    .basePath("mocks/")             // src/test/resources/mocks/...
+    .noDelay()
+    .build()
+```
 
 ## Configuration reference
 
@@ -479,18 +577,19 @@ Mocks only for tests can go in `src/test/resources` and be read from the classpa
 | `failurePercentage(Int)` | `0` | From 0 to 100. |
 | `failureCode(Int)` | `504` | A 4xx or 5xx status. |
 | `logger(MockLogger)` | `MockLogger.STDOUT` | `MockLogger.NONE` silences it. |
+| `extensions(vararg String)` | `"json"` | Extensions of mock files, in the order they are tried. Replaces the default. See [Mocks that are not JSON](#mocks-that-are-not-json). |
 | `failOnMissingMock()` | off | Throw `MissingMockException` instead of answering 404. |
 | `recordCalls()` | off | Keep the requests in `recordedCalls`. |
 | `build()` | | Validates the configuration and throws `IllegalArgumentException` if a value is out of range. |
 
 The interceptor exposes its configuration as read-only properties: `basePath`, `failurePercentage`,
-`failureCode`, `minDelayMilliseconds` and `maxDelayMilliseconds`, plus `recordedCalls` and
+`failureCode`, `minDelayMilliseconds`, `maxDelayMilliseconds` and `extensions`, plus `recordedCalls` and
 `clearRecordedCalls()` (see [Using it in tests](#using-it-in-tests)).
 
 ### Constructors kept from 3.0
 
 They keep existing code working. New code is clearer with the builder, which is also the only way to
-set `failureCode`, `logger`, `failOnMissingMock()` and `recordCalls()`.
+set `failureCode`, `logger`, `extensions`, `failOnMissingMock()` and `recordCalls()`.
 
 | Constructor | Equivalent builder |
 | --- | --- |
@@ -510,7 +609,8 @@ The contract:
 - **Return `null` for a missing file, quickly and without logging.** The interceptor asks for several
   names per request and most of them do not exist: up to six for a request whose exact file exists, and
   from a handful to over a hundred, depending on the number of path segments and query parameters, for
-  one answered by an `{id}` file or by nothing.
+  one answered by an `{id}` file or by nothing. Each extension listed with `extensions(...)` multiplies
+  those numbers.
 - **Open exactly the file you are asked for.** Answering an unknown name with some other file breaks
   the order in which mocks are chosen, because the provider is asked for the method files before the
   shared ones. `{id}` files cover the usual reason for doing it.
@@ -528,11 +628,12 @@ val assets = InputStreamProvider { path ->
 }
 ```
 
-Classpath resources, for example `src/test/resources`. `getResourceAsStream` already returns `null` for
-a missing file:
+Classpath resources, for example `src/test/resources`, the resources of a jar or the Java resources of
+an APK: the built-in `ClasspathInputStreamProvider()`, which uses the class loader of the library or the
+one it is given. Paths are resource names, so a folder of mocks goes in `basePath`:
 
 ```kotlin
-val resources = InputStreamProvider { path -> javaClass.classLoader.getResourceAsStream(path) }
+OkHttpMockInterceptor.Builder(ClasspathInputStreamProvider()).basePath("mocks/").build()
 ```
 
 Files in memory:
@@ -595,7 +696,7 @@ own interceptor, or its own provider map, since the file for a URL is always the
 2. The method, path and query of the request are turned into the list of candidate files described
    in [the full lookup order](#the-full-lookup-order). Host, headers and body play no part.
 3. The provider is asked for each candidate in turn, and the first one it has is the mock.
-4. If the mock is a wrapper, its status, headers, latency and body are read from it.
+4. If the mock is a `.json` wrapper, its status, headers, latency and body are read from it.
 5. The interceptor waits the latency, decides whether the call is a simulated failure, logs one line,
    records the call if asked to, and builds the response with protocol `HTTP/1.1`.
 
@@ -604,30 +705,27 @@ The only state that changes is the list of recorded calls, which is guarded by a
 
 ## Example
 
-The [sample app](app) reads its mocks from [`app/src/main/assets`](app/src/main/assets). Its screen
-lists the users and shows the result of calling the same resource with POST, PUT, DELETE and a GET that
-answers 404:
+The [sample app](app) is a catalog of every feature of the library, written with Jetpack Compose. Each
+screen explains one feature and sends real requests through an `OkHttpMockInterceptor` that reads the
+mock files in [`app/src/main/assets`](app/src/main/assets), showing the status, the headers, the file
+that answered and the body, with images decoded and PDFs rendered:
 
-```
-api/v1/
-├── users.post.json            POST   /api/v1/users           201 + Location header
-└── users/
-    ├── page=1.json            GET    /api/v1/users?page=1    plain array
-    ├── page=2.get.json        GET    /api/v1/users?page=2    wrapped empty array + header
-    ├── 1.json                 GET    /api/v1/users/1         plain object
-    ├── 1.put.json             PUT    /api/v1/users/1         plain object
-    ├── 1.delete.json          DELETE /api/v1/users/1         204, no body
-    ├── 9.get.json             GET    /api/v1/users/9         404 with an error body
-    ├── {id}.json              GET    /api/v1/users/<any other id>
-    ├── 2.json
-    ├── 3.json
-    ├── 1/phoneNumbers.json    GET    /api/v1/users/1/phoneNumbers
-    ├── 2/phoneNumbers.json
-    └── 3/phoneNumbers.json
-```
+| Screen | What it shows |
+| --- | --- |
+| Paths and queries | Query files, the fallback to the path file, parameters in any order, nested paths and the root path (`index.json`, `index.post.json`) |
+| One URL, many methods | `GET`, `PUT`, `DELETE` and `POST` on the same URL, each with its own file |
+| Paths with ids | `users/{id}.json` for any id, and the exact file winning over it |
+| Status, headers and latency | Wrapped mocks: 201 with `Location`, 204, 404, 422 and a slow mock with `delayMs` |
+| Not only JSON | `extensions(...)` with an image, PDF, SVG, XML, HTML, CSV, text and an unknown extension |
+| Classpath resources | `ClasspathInputStreamProvider` reading the app's Java resources, `{id}` file included |
+| When no mock matches | The 404 that lists the files tried, and `failOnMissingMock()` |
+| Simulated network | Latency, failure percentage and status, strict mode, and ten calls at once |
+| Recorded calls and log | `recordCalls()` with the body each call sent, and the `MockLogger` lines of the session |
+| With Retrofit | A typed `UsersService` answered by the same files |
 
-Run it with `./gradlew :app:installDebug`. The same files are checked by the library's tests
-(`SampleMocksTest`).
+Run it with `./gradlew :app:installDebug`. Its instrumented tests (`app/src/androidTest`) check every
+feature on a device, one test per extension included, and run the Android snippets of this README as
+they are written. The library's `SampleMocksTest` checks the same files on the JVM.
 
 ## Troubleshooting
 
@@ -693,7 +791,7 @@ once`.)
 
 ## Migrating from 3.0
 
-1. Change the dependency to `io.github.brodriro:okhttp-json-mock:4.0.0`, which is on Maven Central.
+1. Change the dependency to `io.github.brodriro:okhttp-json-mock:4.1.0`, which is on Maven Central.
    If the JitPack repository was only there for this library, remove it.
 2. Change the imports from `ir.mirrajabi.okhttpjsonmock` to `io.github.brodriro.okhttpjsonmock`.
 3. If you called the setters (`setBasePath`, `setFailurePercentage`, ...), use `OkHttpMockInterceptor.Builder`

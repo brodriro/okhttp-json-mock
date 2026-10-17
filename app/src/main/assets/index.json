@@ -1,0 +1,8 @@
+{
+  "name": "okhttp-json-mock sample",
+  "api": "v1",
+  "links": {
+    "users": "/api/v1/users",
+    "files": "/api/v1/files"
+  }
+}

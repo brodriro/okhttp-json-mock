@@ -1,0 +1,3 @@
+Release notes
+
+- Mocks that are not JSON: áéíóú ñ €

@@ -1,6 +1,7 @@
 import io.github.brodriro.okhttpjsonmock.MissingMockException
 import io.github.brodriro.okhttpjsonmock.MockLogger
 import io.github.brodriro.okhttpjsonmock.OkHttpMockInterceptor
+import io.github.brodriro.okhttpjsonmock.providers.ClasspathInputStreamProvider
 import io.github.brodriro.okhttpjsonmock.providers.InputStreamProvider
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -70,6 +71,24 @@ fun main() {
         strict.recordedCalls.map { it.statusCode } == listOf(200, null) && strict.recordedCalls[0].mockFile == "api/v1/users.json",
         "calls are recorded with file and status",
     )
+    strictClient.newCall(Request.Builder().url(url).post("""{"name":"Ana"}""".toRequestBody()).build()).execute().close()
+    check(
+        strict.recordedCalls[0].body == null && strict.recordedCalls[2].body?.utf8() == """{"name":"Ana"}""",
+        "calls are recorded with their body",
+    )
+
+    val fromClasspath = OkHttpClient.Builder()
+        .addInterceptor(
+            OkHttpMockInterceptor.Builder(ClasspathInputStreamProvider()).basePath("mocks/").noDelay()
+                .logger(MockLogger.NONE).build(),
+        )
+        .build()
+    fromClasspath.newCall(Request.Builder().url("http://example.com/api/ping").build()).execute().use {
+        check(
+            it.code == 200 && it.body!!.string().trim() == """{"pong":true}""",
+            "ClasspathInputStreamProvider serves resources",
+        )
+    }
 
     JavaConsumer.run().forEach { (what, ok) -> check(ok, "Java: $what") }
 
