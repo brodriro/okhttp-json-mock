@@ -105,7 +105,7 @@ The library is on Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("io.github.brodriro:okhttp-json-mock:4.0.0")
+    implementation("io.github.brodriro:okhttp-json-mock:4.1.0")
 }
 ```
 
@@ -791,7 +791,7 @@ once`.)
 
 ## Migrating from 3.0
 
-1. Change the dependency to `io.github.brodriro:okhttp-json-mock:4.0.0`, which is on Maven Central.
+1. Change the dependency to `io.github.brodriro:okhttp-json-mock:4.1.0`, which is on Maven Central.
    If the JitPack repository was only there for this library, remove it.
 2. Change the imports from `ir.mirrajabi.okhttpjsonmock` to `io.github.brodriro.okhttpjsonmock`.
 3. If you called the setters (`setBasePath`, `setFailurePercentage`, ...), use `OkHttpMockInterceptor.Builder`
